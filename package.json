@@ -1,0 +1,53 @@
+{
+  "name": "nium-wiki",
+  "version": "0.0.1",
+  "description": "Professional-grade structured project Wiki generator, powered by AI coding tools",
+  "main": "dist/index.js",
+  "bin": {
+    "nium-wiki": "dist/serve.js"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/copy-vendor.js",
+    "bundle": "ncc build src/cli.ts -o skills/nium-wiki/bin --minify && find skills/nium-wiki/bin \\( -name '*.d.ts' -o -name '*.d.ts.map' \\) -delete && find skills/nium-wiki/bin -type d -empty -delete",
+    "start": "node dist/serve.js",
+    "dev": "ts-node src/cli.ts"
+  },
+  "keywords": [
+    "wiki",
+    "documentation",
+    "generator",
+    "mermaid",
+    "ai",
+    "code-analysis",
+    "offline",
+    "incremental",
+    "cross-linked",
+    "skill",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niuma996/nium-wiki.git"
+  },
+  "bugs": {
+    "url": "https://github.com/niuma996/nium-wiki/issues"
+  },
+  "homepage": "https://github.com/niuma996/nium-wiki#readme",
+  "files": [
+    "dist/"
+  ],
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@vercel/ncc": "^0.38.4",
+    "docsify": "^4.13.1",
+    "docsify-mermaid": "^2.0.1",
+    "mermaid": "^10.9.0",
+    "prismjs": "^1.29.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}

@@ -20,6 +20,14 @@ A skill for AI coding tools (e.g., Claude Code) that turns codebases into high-q
 
 ## Quick Start
 
+### Installation
+
+Before using Nium-Wiki, you need to add it as a skill to your AI coding tool:
+
+```bash
+npx skills add https://github.com/niuma996/nium-wiki --skill nium-wiki
+```
+
 Nium-Wiki works as an AI coding tool skill (e.g. Claude Code). Just tell the AI:
 
 ```

@@ -20,6 +20,14 @@ AI 编程工具（如 Claude Code）的 Skill，将代码库转化为高质量 W
 
 ## 快速上手
 
+### 安装
+
+在使用 Nium-Wiki 之前，需要先将其添加为 AI 编程工具的 skill：
+
+```bash
+npx skills add https://github.com/niuma996/nium-wiki --skill nium-wiki
+```
+
 Nium-Wiki 作为AI编程工具 skill 使用（如Claude Code），直接对 AI 说：
 
 ```

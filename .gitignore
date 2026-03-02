@@ -112,3 +112,6 @@ vite.config.ts.timestamp-*
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Skill lock file
+skills-lock.json

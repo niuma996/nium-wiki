@@ -28,7 +28,7 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 ### Depth of Coverage
 - Provide **full context** for every topic — never leave bare lists or placeholder outlines
 - Write **specific, explanatory** descriptions that address the WHY and HOW behind each concept
-- Supply **runnable code examples** paired with their expected output
+- Supply **runnable code examples** paired with their expected output (🔴 secrets must be sanitized - see "Secret & Credential Sanitization")
 - Call out **edge cases, caveats, and common mistakes** explicitly
 
 ### Structural Conventions
@@ -50,6 +50,36 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 | `[foo.ts](C:\Users\x\project\src\foo.ts)` | `[foo.ts](/src/foo.ts)` | No Windows paths |
 
 **Conversion rule**: Given any absolute path, remove everything up to and including the project root directory name, then prepend `/`. Example: `file:///home/user/my-project/src/core/foo.ts` → `/src/core/foo.ts`.
+
+### 🔴 MANDATORY: Secret & Credential Sanitization
+
+> **CRITICAL**: NEVER include actual secrets, credentials, API keys, or sensitive information in generated documentation.
+
+**MANDATORY sanitization rules**:
+
+| Scenario | Action | Example |
+|----------|--------|---------|
+| Hard-coded API keys in source | Replace with placeholders | `sk_live_abc123` → `sk_live_XXXXXXXXXXXX` |
+| Database credentials | Redact or use example values | `password: "mysecret123"` → `password: "***REDACTED***"` |
+| Private tokens/keys | Mask with descriptive placeholders | `TOKEN=secret123` → `TOKEN=<your-api-token-here>` |
+| Environment vars with secrets | Show safe example values | `AWS_SECRET_ACCESS_KEY=xyz` → `AWS_SECRET_ACCESS_KEY=<your-secret-key>` |
+
+**Sanitization pattern library**:
+- API keys: `sk_live_XXXXXXXX`, `pk_test_XXXXXXXX`, `api_key_XXXXXXXX`
+- Passwords: `***REDACTED***`, `<your-password-here>`
+- Tokens: `<your-access-token>`, `<auth-token-here>`
+- Generic: `XXXXXXXX`, `<secret-value>`, `<sensitive-data>`
+
+**Code example transformation**:
+```typescript
+// ❌ Before (contains real secret)
+const client = new ApiClient('sk_live_abc123xyz456', 'production');
+
+// ✅ After (sanitized)
+const client = new ApiClient('sk_live_XXXXXXXXXXXX', 'production');
+```
+
+**Exception**: Mermaid diagrams, source file path links, and markdown structure MUST still be preserved unchanged (except for secret removal within code blocks).
 
 ### Diagram Requirements (at least 2-3 per document)
 | Content Type | Diagram Type | Condition |
@@ -210,6 +240,7 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 3. **Include comments**: Explain key steps and design intent
 4. **Match project language**: Follow language best practices
 5. **Tiered examples for core APIs**: Use three levels — basic usage, advanced usage (optional params / composition), and error handling (try/catch, edge cases)
+6. **🔴 MANDAT: Sanitized secrets**: NO actual credentials, API keys, tokens, or sensitive data — use placeholders instead (see "Secret & Credential Sanitization" section above)
 
 ### 🔴 MANDATORY: classDiagram for Every Core Class
 
@@ -293,6 +324,7 @@ Save structure to `cache/structure.json`.
    - Data flow paths and state mutations
    - Error handling strategies
    - Design patterns in use
+   - 🔴 **Secrets detection**: Identify hard-coded credentials, API keys, tokens, and sensitive data that need sanitization
 4. **Map relationships**: Module dependencies, call graphs, data flow
 5. **Flag complexity hotspots**: Functions with deep nesting (> 4 levels), high branching (> 10 conditions), or excessive length (> 100 LOC). Document these in module docs with logic explanations and refactoring suggestions.
 
@@ -420,7 +452,8 @@ For each file:
 1. Read the primary wiki file from `wiki/`
 2. Translate content to the target language
 3. Write to `wiki_{lang}/` with **identical path and filename** (e.g. `wiki/core/auth.md` → `wiki_en/core/auth.md`)
-4. **Preserve unchanged**: all Mermaid diagrams, code blocks, source path links, and markdown structure
+4. **Preserve unchanged**: all Mermaid diagrams, code blocks (EXCEPT sanitize any secrets/credentials if found), source path links, and markdown structure
+   - **Secret sanitization exception**: If code blocks contain secrets/credentials, sanitize them using the rules from the "Secret & Credential Sanitization" section
 
 After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 

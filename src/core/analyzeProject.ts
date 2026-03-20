@@ -16,6 +16,12 @@ export interface ModuleInfo {
   path: string;
   files: number;
   type: string;
+  /** 语义角色（来自 analyze-module 的推荐，可覆盖） */
+  role?: 'core' | 'api' | 'utility' | 'ui' | 'test' | 'config' | 'unknown';
+  /** 推荐的文档模板（来自 analyze-module 的推荐，可覆盖） */
+  template?: 'module.md' | 'module-simple.md';
+  /** 复杂度评分（0-100） */
+  complexity?: number;
 }
 
 export interface ProjectStats {

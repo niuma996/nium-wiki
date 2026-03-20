@@ -70,15 +70,6 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 - Tokens: `<your-access-token>`, `<auth-token-here>`
 - Generic: `XXXXXXXX`, `<secret-value>`, `<sensitive-data>`
 
-**Code example transformation**:
-```typescript
-// ❌ Before (contains real secret)
-const client = new ApiClient('sk_live_abc123xyz456', 'production');
-
-// ✅ After (sanitized)
-const client = new ApiClient('sk_live_XXXXXXXXXXXX', 'production');
-```
-
 **Exception**: Mermaid diagrams, source file path links, and markdown structure MUST still be preserved unchanged (except for secret removal within code blocks).
 
 ### Diagram Requirements (at least 2-3 per document)
@@ -146,6 +137,7 @@ When generating Mermaid diagrams, **MUST** follow these rules to ensure error-fr
 | Node labels must be quoted | `A["CLI Entry"]` | `A[CLI Entry]` | Labels with spaces/non-ASCII fail without quotes |
 | Node IDs must be alphanumeric | `CoreModule["Core Module"]` | `CoreModule123["Core Module"]` | Non-ASCII IDs incompatible in some versions |
 | subgraph IDs must be English | `subgraph Core["Core Layer"]` | `subgraph CoreLayer` | Non-ASCII subgraph IDs unstable |
+| **subgraph ID 与内部 node ID 不得重名** | `subgraph CL["CLI Layer"]` + `CLI["cli.ts"]` | `subgraph CLI["CLI Layer"]` + `CLI["cli.ts"]` | subgraph ID 与 node ID 共享命名空间，重复会导致渲染错误 |
 | Escape quotes in labels with HTML entities | `A["Config &quot;key&quot;"]` | `A["Config "key""]` | Nested quotes break syntax |
 | sequenceDiagram participant IDs must be alphanumeric | `participant U as User` | `participant User123` | Non-ASCII participant IDs may error |
 | Avoid mermaid reserved words as IDs | `NodeClass["class"]` | `class["class"]` | `class` is a reserved keyword |
@@ -154,11 +146,7 @@ When generating Mermaid diagrams, **MUST** follow these rules to ensure error-fr
 
 ### 🔴 MANDATORY: Source File Back-References
 
-**Each section MUST end with links back to the originating source files**:
-
-> **Path rule**: Same as "Link Path Format" above — project-root-relative POSIX paths starting with `/`.
-> If the IDE gives you `file:///Users/x/project/src/cli.ts`, you MUST convert it to `/src/cli.ts`.
-> NEVER copy `file://` URIs directly into the output.
+**Each section MUST end with links back to the originating source files** (see "Link Path Format" above for path rules):
 
 ```markdown
 **Source references**
@@ -229,18 +217,20 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 | 5 | **Best Practices** | ⚡ OPTIONAL |
 | 6 | **Related Docs** | Cross-links |
 
-**Template selection rule**: Use `module-simple.md` when `module_role` is util, config, test, or example. Use `module.md` for core modules.
+**Template selection**: Before generating each module's documentation, run `nium-wiki analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use the output as **context** — the `roleRecommendation` and `templateRecommendation` are based on quantifiable metrics (export count, complexity score, dependency stats) but are **overrideable**: your semantic understanding of the module's business role takes precedence.
 
-### 🔴 Code Examples (Optimized for AI & Architecture Audits)
+> Code provides signals. You make the final decision.
 
-**The primary consumers are AI agents and architecture reviewers.** Every code example must:
+### 🔴 Code Examples
+
+Every code example must:
 
 1. **Complete and runnable**: Include import, initialization, invocation, result handling
 2. **Cover exported interfaces**: At least 1 example per major exported API
 3. **Include comments**: Explain key steps and design intent
 4. **Match project language**: Follow language best practices
-5. **Tiered examples for core APIs**: Use three levels — basic usage, advanced usage (optional params / composition), and error handling (try/catch, edge cases)
-6. **🔴 MANDAT: Sanitized secrets**: NO actual credentials, API keys, tokens, or sensitive data — use placeholders instead (see "Secret & Credential Sanitization" section above)
+5. **Tiered examples for core APIs**: Three levels — basic usage, advanced usage, and error handling
+6. **Sanitized secrets**: NO actual credentials — use placeholders (see "Secret & Credential Sanitization" above)
 
 ### 🔴 MANDATORY: classDiagram for Every Core Class
 
@@ -271,6 +261,7 @@ class ClassName {
 ```bash
 node .claude/skills/nium-wiki/bin/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
 node .claude/skills/nium-wiki/bin/index.js analyze [path]           # Analyze project structure
+node .claude/skills/nium-wiki/bin/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
 node .claude/skills/nium-wiki/bin/index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
 node .claude/skills/nium-wiki/bin/index.js build-index [path]       # Build source ↔ doc mapping index
 node .claude/skills/nium-wiki/bin/index.js build-deps [path]        # Build import/require dependency graph
@@ -375,26 +366,26 @@ Not all templates are needed for every project. Apply these rules:
 | `doc-map.md` | module count >= 5 |
 
 #### 6.1 Homepage (`index.md`)
-**Template**: Read `references/templates/index.md` for full structure.
+**Template**: Read `skills/nium-wiki/templates/index.md` for full structure.
 
 #### 6.2 Architecture Doc (`architecture.md`)
-**Template**: Read `references/templates/architecture.md` for full structure.
+**Template**: Read `skills/nium-wiki/templates/architecture.md` for full structure.
 
 #### 6.3 Module Docs (`modules/<name>.md`)
-**Templates**: Read `references/templates/module.md` (core) or `references/templates/module-simple.md` (util/config/helper/test).
+**Templates**: Read `skills/nium-wiki/templates/module.md` (core) or `skills/nium-wiki/templates/module-simple.md` (util/config/helper/test).
 - **Key rule**: Detailed API signatures and type definitions belong exclusively in api.md. Module docs only contain an API overview table with a link.
 
 #### 6.4 API Docs (`api/<name>.md`)
-**Template**: Read `references/templates/api.md` for full structure.
+**Template**: Read `skills/nium-wiki/templates/api.md` for full structure.
 - Single source of truth for all API signatures and type definitions.
 - Mark `@deprecated` APIs with migration guidance (what to use instead).
 - Include parameter constraints where applicable (e.g. "must not be empty", "range 0-100").
 
 #### 6.5 Getting Started (`getting-started.md`)
-**Template**: Read `references/templates/getting-started.md` for full structure.
+**Template**: Read `skills/nium-wiki/templates/getting-started.md` for full structure.
 
 #### 6.6 Doc Map (`doc-map.md`)
-**Template**: Read `references/templates/doc-map.md` for full structure.
+**Template**: Read `skills/nium-wiki/templates/doc-map.md` for full structure.
 
 ### 7. Source Code Links
 
@@ -430,17 +421,7 @@ If secondary languages are configured (e.g. `zh/en`):
 
 #### 9.1 Build Translation Task List
 
-Run `node .claude/skills/nium-wiki/bin/index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist.
-
-Example output:
-```
-🌐 Language: en
-  Total files: 17 | ✅ Synced: 0 | ⚠️ Outdated: 0 | ❌ Missing: 17
-  ❌ [Missing] index.md
-  ❌ [Missing] architecture.md
-  ❌ [Missing] core/_index.md
-  ...
-```
+Run `node .claude/skills/nium-wiki/bin/index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
 

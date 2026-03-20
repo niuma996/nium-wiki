@@ -35,6 +35,12 @@ import {
   printSyncStatus,
   syncMemory,
 } from './utils/i18n';
+import {
+  analyzeModule,
+  analyzeAllModules,
+  formatModuleAnalysis,
+  printBatchAnalysis,
+} from './commands/analyzeModule';
 const program = new Command();
 
 program
@@ -67,6 +73,51 @@ program
     const resolved = path.resolve(projectPath);
     const result = await analyzeProject(resolved, opts.cache);
     printAnalysis(result);
+  });
+
+// ── analyze-module ───────────────────────────────────────────
+program
+  .command('analyze-module')
+  .description('Analyze a specific module: classify role, recommend template, estimate complexity')
+  .argument('[module-path]', 'Module directory path (relative to project root, or absolute)', '')
+  .option('--batch', 'Analyze all modules in src/ (default: discover src directories automatically)', false)
+  .option('--json', 'Output structured JSON for machine consumption', false)
+  .action((modulePath: string, opts: { batch: boolean; json: boolean }) => {
+    const projectRoot = process.cwd();
+
+    if (opts.batch) {
+      const result = analyzeAllModules(projectRoot);
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        printBatchAnalysis(result);
+      }
+      return;
+    }
+
+    if (!modulePath) {
+      console.error('Error: module-path is required (or use --batch to analyze all modules)');
+      console.log('Usage: nium-wiki analyze-module <module-path> [--batch|--json]');
+      process.exitCode = 1;
+      return;
+    }
+
+    const resolved = path.isAbsolute(modulePath)
+      ? path.resolve(modulePath)
+      : path.resolve(projectRoot, modulePath);
+
+    if (!fs.existsSync(resolved)) {
+      console.error(`Error: Module path does not exist: ${resolved}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const analysis = analyzeModule(resolved, projectRoot);
+    if (opts.json) {
+      console.log(JSON.stringify(analysis, null, 2));
+    } else {
+      console.log(formatModuleAnalysis(analysis));
+    }
   });
 
 // ── diff-index ────────────────────────────────────────────

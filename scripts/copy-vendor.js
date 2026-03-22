@@ -46,7 +46,17 @@ for (const [dest, src] of Object.entries(VENDOR_FILES)) {
     let content = fs.readFileSync(srcPath, 'utf-8');
     content = content.replace(/@import\s+url\([^)]*fonts\.googleapis\.com[^)]*\);?\s*/g, '');
     fs.writeFileSync(destPath, content, 'utf-8');
-  } else {
+  }
+  // Special handling for docsify-mermaid: preserve original code in data-code for toggle/copy
+  else if (dest === 'docsify-mermaid/docsify-mermaid.js') {
+    let content = fs.readFileSync(srcPath, 'utf-8');
+    content = content.replace(
+      "replacement.classList.add('mermaid');\n\n        // Replace\n        element.parentNode.replaceChild(replacement, element);",
+      "replacement.classList.add('mermaid');\n        replacement.setAttribute('data-code', element.textContent);\n\n        // Replace\n        element.parentNode.replaceChild(replacement, element);"
+    );
+    fs.writeFileSync(destPath, content, 'utf-8');
+  }
+  else {
     fs.copyFileSync(srcPath, destPath);
   }
 

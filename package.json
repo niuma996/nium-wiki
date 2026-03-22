@@ -1,14 +1,14 @@
 {
   "name": "nium-wiki",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "Professional-grade structured project Wiki generator, powered by AI coding tools",
-  "main": "dist/index.js",
+  "main": "dist/serve.js",
   "bin": {
     "nium-wiki": "dist/serve.js"
   },
   "scripts": {
-    "build": "tsc && node scripts/copy-vendor.js",
-    "bundle": "ncc build src/cli.ts -o skills/nium-wiki/bin --minify && find skills/nium-wiki/bin \\( -name '*.d.ts' -o -name '*.d.ts.map' \\) -delete && find skills/nium-wiki/bin -type d -empty -delete",
+    "build": "tsc -p tsconfig.server.json && node scripts/copy-vendor.js",
+    "bundle": "ncc build src/cli.ts -o skills/nium-wiki/bin --minify && node scripts/post-bundle.js",
     "start": "node dist/serve.js",
     "dev": "ts-node src/cli.ts"
   },

@@ -1,5 +1,7 @@
 /**
+ * Documentation Extraction Module
  * 文档提取模块
+ * Extracts JSDoc/TSDoc/DocString comments from code files
  * 从代码文件中提取 JSDoc/TSDoc/DocString 注释
  */
 
@@ -11,8 +13,9 @@ import { DocEntry } from '../language-handlers/base.js';
 export { DocEntry };
 
 /**
+ * Extract documentation comments from a file
  * 从文件中提取文档注释
- * @param filePath 文件路径
+ * @param filePath File path / 文件路径
  */
 export function extractDocsFromFile(filePath: string): DocEntry[] {
   if (!fs.existsSync(filePath)) return [];
@@ -24,13 +27,14 @@ export function extractDocsFromFile(filePath: string): DocEntry[] {
     return [];
   }
 
-  // 使用语言处理器管理器根据文件扩展名自动检测语言
+  // Use language handler manager to auto-detect language from file extension / 使用语言处理器管理器根据文件扩展名自动检测语言
   return languageHandlerManager.extractDocs(content, filePath);
 }
 
 /**
+ * Extract documentation comments from multiple files
  * 从多个文件中提取文档注释
- * @param filePaths 文件路径列表
+ * @param filePaths List of file paths / 文件路径列表
  */
 export function extractDocsFromFiles(filePaths: string[]): DocEntry[] {
   const allEntries: DocEntry[] = [];
@@ -40,7 +44,7 @@ export function extractDocsFromFiles(filePaths: string[]): DocEntry[] {
       const entries = extractDocsFromFile(filePath);
       allEntries.push(...entries);
     } catch {
-      // 忽略单个文件的错误
+      // Ignore errors for individual files / 忽略单个文件的错误
     }
   }
 
@@ -48,9 +52,10 @@ export function extractDocsFromFiles(filePaths: string[]): DocEntry[] {
 }
 
 /**
+ * Extract documentation by language ID
  * 根据语言ID提取文档
- * @param filePath 文件路径
- * @param languageId 语言标识符（可选，如果不提供则自动检测）
+ * @param filePath File path / 文件路径
+ * @param languageId Language identifier (optional, auto-detected if not provided) / 语言标识符（可选，如果不提供则自动检测）
  */
 export function extractDocsFromFileByLanguage(filePath: string, languageId?: string): DocEntry[] {
   if (!fs.existsSync(filePath)) return [];
@@ -69,13 +74,14 @@ export function extractDocsFromFileByLanguage(filePath: string, languageId?: str
     }
   }
 
-  // 使用语言处理器管理器根据文件扩展名自动检测语言
+  // Use language handler manager to auto-detect language from file extension / 使用语言处理器管理器根据文件扩展名自动检测语言
   return languageHandlerManager.extractDocs(content, filePath);
 }
 
 /**
+ * Convert documentation entries to Markdown format
  * 将文档条目转换为 Markdown 格式
- * @param entries 文档条目列表
+ * @param entries List of documentation entries / 文档条目列表
  */
 export function docsToMarkdown(entries: DocEntry[]): string {
   const lines: string[] = [];
@@ -134,16 +140,18 @@ export function docsToMarkdown(entries: DocEntry[]): string {
 }
 
 /**
+ * Convert documentation entries to JSON format
  * 将文档条目转换为 JSON 格式
- * @param entries 文档条目列表
+ * @param entries List of documentation entries / 文档条目列表
  */
 export function docsToJson(entries: DocEntry[]): string {
   return JSON.stringify(entries, null, 2);
 }
 
 /**
+ * Summarize documentation entries
  * 统计文档条目
- * @param entries 文档条目列表
+ * @param entries List of documentation entries / 文档条目列表
  */
 export function summarizeDocs(entries: DocEntry[]): {
   total: number;

@@ -2,13 +2,10 @@
 
 <!--
   This template defines the structure for API reference documentation.
-  本模板定义 API 参考文档的结构。
 
   This is the single source of truth for API signatures, parameters, and types.
-  此文件是 API 签名、参数、类型定义的唯一权威来源。
 
   Replace {{ placeholders }} with actual API content.
-  将 {{ 占位符 }} 替换为实际 API 内容。
 -->
 
 ---
@@ -18,7 +15,7 @@
 ## Module Overview / 模块概述
 
 <!--
-  Brief overview with import example / 简要概述（含 import 示例）
+  Brief overview with import example.
 -->
 
 {{ MODULE_OVERVIEW }}
@@ -30,7 +27,7 @@
 ## API Overview / API 概览
 
 <!--
-  API overview table / API 概览表
+  API overview table.
 -->
 
 | API | Type | Description |
@@ -42,7 +39,7 @@
 ## Type Definitions / 类型定义
 
 <!--
-  Type definitions with property tables / 类型定义（含属性表）
+  Type definitions with property tables.
 -->
 
 ### `{{ TYPE_NAME }}`
@@ -60,10 +57,8 @@
 
 <!--
   For each function: signature, params, returns, exceptions, 1-3 code examples.
-  每个函数：签名、参数、返回值、异常、1-3 个代码示例。
 
   Example count depends on API complexity:
-  示例数量取决于 API 复杂度：
   - Simple utility functions: 1 example (basic usage)
   - Moderate functions: 2 examples (basic + advanced or error handling)
   - Complex functions with multiple modes: 3 examples (basic + advanced + error handling)
@@ -98,7 +93,6 @@
 
 <!--
   OPTIONAL: Add more examples if the API is complex enough to warrant them.
-  可选：如果 API 足够复杂，可添加更多示例。
 -->
 
 **Section sources**
@@ -107,8 +101,7 @@
 ## Classes / 类
 
 <!--
-  For each class: class diagram, constructor, properties, methods
-  每个类：类图、构造函数、属性、方法
+  For each class: class diagram, constructor, properties, methods.
 -->
 
 ### `{{ CLASS_NAME }}`
@@ -153,7 +146,7 @@ class {{ CLASS_NAME }} {
 ## Usage Patterns / 使用模式
 
 <!--
-  Common usage patterns and recipes / 常见使用模式和配方
+  Common usage patterns and recipes.
 -->
 
 ### {{ PATTERN_1_NAME }}
@@ -168,10 +161,7 @@ class {{ CLASS_NAME }} {
 
 <!--
   OPTIONAL: Include for complex APIs with common pitfalls.
-  可选：适用于有常见陷阱的复杂 API。
-
   Skip this section for straightforward APIs.
-  简单直观的 API 可跳过此节。
 -->
 
 ## Related Documents / 相关文档

@@ -1,11 +1,17 @@
 /**
- * 模块分析命令 / Module Analysis Command
+ * Module Analysis Command
+ * 模块分析命令
  *
+ * Code takes over the quantitative work of module classification (file count, export count, complexity, dependency count),
  * 代码接管模块分类的量化工作（文件数、导出数、复杂度、依赖数），
+ * outputting structured signals for the model to make final semantic decisions.
  * 输出结构化信号供模型做最终语义决策。
  *
+ * Design principles:
  * 设计原则：
+ * - Code is responsible for deterministic, quantifiable metrics
  * - 代码负责确定性、可量化的指标
+ * - Model retains final role judgment rights (recommendation.isOverrideable = true)
  * - 模型保留最终角色判断权（recommendation.isOverrideable = true）
  */
 
@@ -17,35 +23,36 @@ import { loadDependencyGraph } from '../core/buildDeps.js';
 export type ModuleRole = 'core' | 'api' | 'utility' | 'ui' | 'test' | 'config' | 'unknown';
 export type TemplateType = 'module.md' | 'module-simple.md';
 
+// ─── Output Structure ───────────────────────────────────────────────
 // ─── 输出结构 ───────────────────────────────────────────────
 
 export interface ModuleSignals {
-  /** 文件数量 */
+  /** Number of files / 文件数量 */
   fileCount: number;
-  /** 代码行数估算（所有文件总和） */
+  /** Estimated line count (sum of all files) / 代码行数估算（所有文件总和） */
   estimatedLines: number;
-  /** 公开导出数量估算 */
+  /** Estimated number of public exports / 公开导出数量估算 */
   exportCount: number;
-  /** 入口文件标记（是否在项目入口路径上） */
+  /** Entry file marker (whether on project entry path) / 入口文件标记（是否在项目入口路径上） */
   isEntry: boolean;
-  /** 入度：被多少其他模块依赖 */
+  /** In-degree: how many other modules depend on this module / 入度：被多少其他模块依赖 */
   incomingDeps: number;
-  /** 出度：依赖多少其他模块 */
+  /** Out-degree: how many other modules this module depends on / 出度：依赖多少其他模块 */
   outgoingDeps: number;
-  /** 最大嵌套深度（用于复杂度评估） */
+  /** Maximum nesting depth (used for complexity assessment) / 最大嵌套深度（用于复杂度评估） */
   maxNestingDepth: number;
-  /** 复杂度评分（0-100） */
+  /** Complexity score (0-100) / 复杂度评分（0-100） */
   complexityScore: number;
-  /** 主要语言 */
+  /** Primary language / 主要语言 */
   primaryLanguage: string | null;
 }
 
 export interface TemplateRecommendation {
-  /** 推荐的模板类型 */
+  /** Recommended template type / 推荐的模板类型 */
   template: TemplateType;
-  /** 推荐理由 */
+  /** Reason for recommendation / 推荐理由 */
   reason: string;
-  /** 量化依据 */
+  /** Quantitative basis / 量化依据 */
   basis: {
     complexityScore: number;
     exportCount: number;
@@ -54,38 +61,39 @@ export interface TemplateRecommendation {
 }
 
 export interface RoleRecommendation {
-  /** 推荐的模块角色 */
+  /** Recommended module role / 推荐的模块角色 */
   role: ModuleRole;
-  /** 推荐理由 */
+  /** Reason for recommendation / 推荐理由 */
   reason: string;
-  /** 贡献最大的信号 */
+  /** Signals that contributed most / 贡献最大的信号 */
   topSignals: string[];
 }
 
 export interface ModuleAnalysis {
-  /** 模块名称（目录名） */
+  /** Module name (directory name) / 模块名称（目录名） */
   name: string;
-  /** 相对项目根的路径 */
+  /** Path relative to project root / 相对项目根的路径 */
   path: string;
-  /** 量化信号（代码负责） */
+  /** Quantitative signals (from code) / 量化信号（代码负责） */
   signals: ModuleSignals;
-  /** 模板推荐（可覆盖） */
+  /** Template recommendation (overridable) / 模板推荐（可覆盖） */
   templateRecommendation: TemplateRecommendation;
-  /** 角色推荐（可覆盖） */
+  /** Role recommendation (overridable) / 角色推荐（可覆盖） */
   roleRecommendation: RoleRecommendation;
-  /** 供模型参考的语义提示 */
+  /** Semantic hints for model reference / 供模型参考的语义提示 */
   semanticHints: string[];
 }
 
 export interface AnalyzeModuleOptions {
-  /** 只输出推荐部分 */
+  /** Only output recommendations / 只输出推荐部分 */
   recommendOnly?: boolean;
-  /** 输出 JSON 格式 */
+  /** Output in JSON format / 输出 JSON 格式 */
   json?: boolean;
-  /** 包含公开导出列表 */
+  /** Include public export list / 包含公开导出列表 */
   includeExports?: boolean;
 }
 
+// ─── Public Export Detection ────────────────────────────────────────────
 // ─── 公开导出检测 ────────────────────────────────────────────
 
 const EXPORT_PATTERNS: Record<string, RegExp[]> = {
@@ -162,6 +170,7 @@ function extractExports(modulePath: string): { count: number; samples: string[] 
   return { count: exports.size, samples: [...exports].slice(0, 10) };
 }
 
+// ─── Complexity Calculation ──────────────────────────────────────────────
 // ─── 复杂度计算 ──────────────────────────────────────────────
 
 /**
@@ -209,6 +218,7 @@ function calculateComplexity(
   return { score: Math.min(score, 100), maxDepth, estimatedLines: totalLines };
 }
 
+// ─── Dependency Statistics ───────────────────────────────────────────────
 // ─── 依赖统计 ────────────────────────────────────────────────
 
 interface DepStats {
@@ -247,6 +257,7 @@ function getModuleDepStats(modulePath: string, graph: ReturnType<typeof loadDepe
   return { incoming, outgoing, isEntry };
 }
 
+// ─── Role Recommendation ────────────────────────────────────────────────
 // ─── 角色推荐 ────────────────────────────────────────────────
 
 /**
@@ -344,6 +355,7 @@ function recommendRole(
   };
 }
 
+// ─── Template Recommendation ──────────────────────────────────────────────
 // ─── 模板推荐 ────────────────────────────────────────────────
 
 /**
@@ -386,6 +398,7 @@ function recommendTemplate(complexity: number, exportCount: number, role: Module
   };
 }
 
+// ─── Semantic Hint Generation ─────────────────────────────────────────────
 // ─── 语义提示生成 ────────────────────────────────────────────
 
 /**
@@ -435,13 +448,14 @@ function generateSemanticHints(moduleName: string, signals: ModuleSignals): stri
   return hints;
 }
 
+// ─── Main Analysis Function ───────────────────────────────────────────────
 // ─── 主分析函数 ──────────────────────────────────────────────
 
 export function analyzeModule(modulePath: string, projectRoot: string): ModuleAnalysis {
   const name = path.basename(modulePath);
   const relPath = path.relative(projectRoot, modulePath).replace(/\\/g, '/');
 
-  // 1. 检测语言
+  // Detect language / 检测语言
   let primaryLang: string | null = null;
   try {
     const files = fs.readdirSync(modulePath, { withFileTypes: true });
@@ -453,16 +467,16 @@ export function analyzeModule(modulePath: string, projectRoot: string): ModuleAn
     }
   } catch { /* ignore */ }
 
-  // 2. 文件数（优先计算，用于后续推荐）
+  // Count files (prioritized for subsequent recommendations) / 文件数（优先计算，用于后续推荐）
   const fileCount = countModuleFiles(modulePath);
 
-  // 3. 公开导出统计
+  // Public export statistics / 公开导出统计
   const exports = extractExports(modulePath);
 
-  // 4. 复杂度评分
+  // Complexity score / 复杂度评分
   const { score, maxDepth, estimatedLines } = calculateComplexity(modulePath, exports.count);
 
-  // 5. 依赖统计
+  // Dependency statistics / 依赖统计
   const graph = loadDependencyGraph(projectRoot);
   const depStats = getModuleDepStats(relPath, graph);
 
@@ -478,13 +492,13 @@ export function analyzeModule(modulePath: string, projectRoot: string): ModuleAn
     primaryLanguage: primaryLang,
   };
 
-  // 6. 角色推荐（可覆盖）
+  // Role recommendation (overridable) / 角色推荐（可覆盖）
   const roleRec = recommendRole(name, signals);
 
-  // 7. 模板推荐（可覆盖）
+  // Template recommendation (overridable) / 模板推荐（可覆盖）
   const templateRec = recommendTemplate(score, exports.count, roleRec.role);
 
-  // 8. 语义提示
+  // Semantic hints / 语义提示
   const semanticHints = generateSemanticHints(name, signals);
 
   return {
@@ -497,6 +511,7 @@ export function analyzeModule(modulePath: string, projectRoot: string): ModuleAn
   };
 }
 
+// ─── Batch Analysis ────────────────────────────────────────────────────────
 // ─── 批量分析 ────────────────────────────────────────────────
 
 export interface BatchModuleAnalysis {
@@ -558,6 +573,7 @@ function countModuleFiles(modulePath: string): number {
   }
 }
 
+// ─── Output Formatting ──────────────────────────────────────────────────────
 // ─── 输出格式化 ──────────────────────────────────────────────
 
 export function formatModuleAnalysis(analysis: ModuleAnalysis): string {

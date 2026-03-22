@@ -1,4 +1,5 @@
 /**
+ * Vendor Static Asset Handling: local file serving for docsify/prismjs/mermaid etc.
  * Vendor 静态资源处理：docsify/prismjs/mermaid 等本地文件服务
  */
 
@@ -35,7 +36,9 @@ export const VENDOR_SCRIPTS = `  <!-- docsify core -->
   <script>mermaid.initialize({ startOnLoad: false, theme: 'default' });</script>`;
 
 /**
+ * Handle /_vendor/* requests, serve static files from dist/vendor/
  * 处理 /_vendor/* 请求，从 dist/vendor/ 提供静态文件
+ * Returns true if handled, false if not a vendor request
  * 返回 true 表示已处理，false 表示非 vendor 请求
  */
 export function handleVendorRequest(urlPath: string, res: http.ServerResponse): boolean {

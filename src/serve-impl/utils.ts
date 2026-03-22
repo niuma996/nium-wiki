@@ -1,4 +1,5 @@
 /**
+ * Common Utilities: MIME types, escape functions, shared interfaces
  * 公共工具：MIME 类型、转义函数、共享接口
  */
 

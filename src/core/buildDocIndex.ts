@@ -1,5 +1,7 @@
 /**
+ * Documentation Index Building Module
  * 文档索引构建模块
+ * Builds bidirectional mapping between source files and Wiki documents
  * 构建源文件 ↔ Wiki 文档的双向映射
  */
 
@@ -22,7 +24,9 @@ export interface DocIndex {
 }
 
 /**
+ * Parse source file references from markdown content
  * 从 markdown 内容中解析源文件引用
+ * Matches project-root-relative paths in format [label](/src/path#L1-L100)
  * 匹配 [label](/src/path#L1-L100) 格式的项目根相对路径
  */
 export function parseSourceReferences(
@@ -30,14 +34,14 @@ export function parseSourceReferences(
   _projectRoot: string,
 ): SourceReference[] {
   const refs: SourceReference[] = [];
-  // 匹配 [label](/src/path#L1-L100) 格式
+  // Match [label](/src/path#L1-L100) format / 匹配 [label](/src/path#L1-L100) 格式
   const pattern = /\[.*?\]\(\/((?:src|lib|app|packages)\/.+?)(?:#L(\d+)(?:-L(\d+))?)?\)/g;
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(mdContent)) !== null) {
     const rawPath = match[1];
 
-    // 跳过示例/模板路径
+    // Skip example/template paths / 跳过示例/模板路径
     if (rawPath.startsWith('src/source.ts') || rawPath.startsWith('src/file.ts') ||
         rawPath.startsWith('src/diagram.ts') || rawPath.startsWith('path/to/')) {
       continue;
@@ -54,15 +58,17 @@ export function parseSourceReferences(
 }
 
 /**
+ * Infer source file corresponding document path via naming convention
  * 通过命名约定推断源文件对应的文档路径
  * camelCase.ts → modules/kebab-case.md
+ * Dynamically gets supported extensions from language handlers
  * 动态从语言处理器获取支持的扩展名
  */
 export function inferDocPath(sourceFile: string): string | null {
-  // 动态构建扩展名匹配模式
+  // Dynamically build extension matching pattern / 动态构建扩展名匹配模式
   const allExtensions = languageHandlerManager.getAllSourceExtensions();
   const extPattern = allExtensions.map(e => e.replace('.', '\\.')).join('|');
-  // 仅处理 src/ 下的顶层源文件
+  // Only process top-level source files under src/ / 仅处理 src/ 下的顶层源文件
   const regex = new RegExp(`^src/([^/]+)(${extPattern})$`);
   const match = sourceFile.match(regex);
   if (!match) return null;
@@ -74,6 +80,7 @@ export function inferDocPath(sourceFile: string): string | null {
 }
 
 /**
+ * Build documentation index: scan wiki dirs, parse source file references, build bidirectional mapping
  * 构建文档索引：扫描 wiki 目录，解析源文件引用，构建双向映射
  */
 export function buildDocIndex(projectRoot: string): DocIndex {
@@ -111,6 +118,7 @@ export function buildDocIndex(projectRoot: string): DocIndex {
 }
 
 /**
+ * For source files without explicit mapping, supplement via naming convention inference
  * 对没有显式映射的源文件，通过命名约定补充推断
  */
 export function enrichWithInference(
@@ -122,7 +130,7 @@ export function enrichWithInference(
     if (index.sourceToDoc[src] && index.sourceToDoc[src].length > 0) continue;
     const inferred = inferDocPath(src);
     if (!inferred) continue;
-    // 仅当推断的文档确实存在时才建立映射
+    // Only create mapping if inferred document actually exists / 仅当推断的文档确实存在时才建立映射
     const fullPath = path.join(wikiDir, inferred);
     if (!fs.existsSync(fullPath)) continue;
 

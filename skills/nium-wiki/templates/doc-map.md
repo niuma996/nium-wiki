@@ -2,10 +2,8 @@
 
 <!--
   This template defines the structure for the documentation map.
-  本模板定义文档地图的结构。
 
   Replace {{ placeholders }} with actual project content.
-  将 {{ 占位符 }} 替换为实际项目内容。
 -->
 
 ---
@@ -15,7 +13,7 @@
 ## Document Relationship Diagram / 文档关系图
 
 <!--
-  MANDATORY: Mermaid flowchart showing document relationships / 必须：文档关系图
+  MANDATORY: Mermaid flowchart showing document relationships.
 -->
 
 ```mermaid
@@ -52,11 +50,9 @@ flowchart TB
 
 <!--
   A single general-purpose reading path for most readers.
-  适用于大多数读者的通用阅读路径。
 
   OPTIONAL: Add role-specific paths (e.g., Architect, AI Agent) if the project
   is large enough to warrant them.
-  可选：如果项目规模足够大，可添加角色专属路径（如架构师、AI 代理）。
 -->
 
 1. [Getting Started](getting-started.md) — {{ GS_WHY }}
@@ -66,7 +62,7 @@ flowchart TB
 ## Complete Document Index / 完整文档索引
 
 <!--
-  Full index of all documents / 所有文档的完整索引
+  Full index of all documents.
 -->
 
 | Document | Path | Description | Category |

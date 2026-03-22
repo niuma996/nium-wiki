@@ -2,13 +2,10 @@
 
 <!--
   Lightweight variant for util / config / helper / test modules.
-  适用于 util / config / helper / test 类轻量模块。
 
   6 sections. Use module.md for core/complex modules.
-  共 6 个章节。核心/复杂模块请使用 module.md。
 
   Replace {{ placeholders }} with actual module content.
-  将 {{ 占位符 }} 替换为实际模块内容。
 -->
 
 ---
@@ -19,7 +16,6 @@
 
 <!--
   1 paragraph: what the module does and its role in the system.
-  1 段：模块功能及其在系统中的角色。
 -->
 
 {{ OVERVIEW_PARAGRAPH }}
@@ -31,7 +27,6 @@
 
 <!--
   API overview table. Detailed docs in api.md.
-  API 概览表。详细文档见 api.md。
 -->
 
 | API | Type | Description |
@@ -44,7 +39,7 @@
 ## 3. Usage Examples / 使用示例
 
 <!--
-  1-2 examples. / 1-2 个示例。
+  1-2 examples.
 -->
 
 ### Quick Start / 快速开始
@@ -56,7 +51,7 @@
 ## 4. File Structure / 文件结构
 
 <!--
-  File tree with responsibility descriptions / 文件树（含职责说明）
+  File tree with responsibility descriptions.
 -->
 
 ```
@@ -69,7 +64,6 @@
 
 <!--
   OPTIONAL: Include if there are notable patterns to follow or avoid.
-  可选：如有值得注意的推荐或避免做法则包含。
 -->
 
 - {{ RECOMMENDED_1 }}

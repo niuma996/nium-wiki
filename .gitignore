@@ -113,5 +113,8 @@ vite.config.ts.timestamp-*
 !.yarn/sdks
 !.yarn/versions
 
+# Claude Code instructions (contains project-specific rules)
+CLAUDE.md
+
 # Skill lock file
 skills-lock.json

@@ -26,7 +26,7 @@ function getDefaultConfig(primaryLang: string): NiumWikiConfig {
 }
 
 function getGitBranch(cwd: string): string {
-  // 优先读取 CI 环境变量
+  // Prefer to read CI environment variables / 优先读取 CI 环境变量
   const envBranch = process.env.GITHUB_REF_NAME
     || process.env.CI_COMMIT_BRANCH
     || process.env.BRANCH_NAME;
@@ -35,7 +35,7 @@ function getGitBranch(cwd: string): string {
   try {
     const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf-8' }).trim();
     if (branch === 'HEAD') {
-      // detached HEAD，取 short hash
+      // detached HEAD, get short hash / detached HEAD，取 short hash
       const hash = execSync('git rev-parse --short HEAD', { cwd, encoding: 'utf-8' }).trim();
       return `detached-${hash}`;
     }

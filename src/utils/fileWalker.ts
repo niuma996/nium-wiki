@@ -1,5 +1,7 @@
 /**
+ * Generic File Traversal Utility
  * 通用文件遍历工具
+ * Unifies all recursive directory traversal logic in the project
  * 统一项目中所有递归目录遍历逻辑
  */
 
@@ -7,17 +9,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export interface WalkOptions {
-  /** 文件扩展名过滤，如 ['.md', '.ts'] */
+  /** File extension filter, e.g. ['.md', '.ts'] / 文件扩展名过滤，如 ['.md', '.ts'] */
   extensions?: string[];
-  /** 排除的目录名 */
+  /** Directory names to exclude / 排除的目录名 */
   excludeDirs?: Set<string>;
-  /** true 返回相对路径，false 返回绝对路径（默认） */
+  /** true returns relative paths, false returns absolute paths (default) / true 返回相对路径，false 返回绝对路径（默认） */
   relative?: boolean;
-  /** 跳过 . 开头的条目 */
+  /** Skip entries starting with . / 跳过 . 开头的条目 */
   skipHidden?: boolean;
 }
 
 /**
+ * Recursively traverse directory, return list of matching file paths
  * 递归遍历目录，返回匹配的文件路径列表
  */
 export function walkFiles(rootDir: string, options: WalkOptions = {}): string[] {

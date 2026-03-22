@@ -1,5 +1,7 @@
 /**
+ * Mermaid Diagram Generation Module
  * Mermaid 图表生成模块
+ * Generates architecture diagrams, dependency graphs, and module relationship diagrams based on project structure
  * 根据项目结构生成架构图、依赖图、模块关系图
  */
 

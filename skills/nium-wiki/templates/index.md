@@ -2,10 +2,8 @@
 
 <!--
   This template defines the structure for the project homepage.
-  本模板定义项目首页的结构。
 
   Replace {{ placeholders }} with actual project content.
-  将 {{ 占位符 }} 替换为实际项目内容。
 -->
 
 ---
@@ -20,7 +18,7 @@
 > {{ ONE_LINER_DESCRIPTION }}
 
 <!--
-  Detailed Introduction (2-3 paragraphs) / 详细介绍（2-3 段）
+  Detailed Introduction (2-3 paragraphs).
   - Paragraph 1: What the project does and its primary purpose
   - Paragraph 2: Key technical approach and architecture philosophy
   - Paragraph 3: Target audience and ecosystem positioning
@@ -35,13 +33,15 @@
 ## Architecture Preview / 架构预览
 
 <!--
-  Simplified Mermaid flowchart showing high-level system architecture.
-  简化版系统架构高层概览。
-
-  This is a condensed view. Full architecture diagram: architecture.md
-  此为精简视图。完整架构图见 architecture.md
+  MANDATORY: Pre-generation checklist — apply before writing any Mermaid diagram.
+  ☑ Every node line ends with `"]` (count opening `"` vs closing `"]`)
+  ☑ No subgraph ID duplicates any node ID in the same diagram
+  ☑ No subgraph ID is a Mermaid reserved word (class, graph, node, subgraph, style, click)
+  ☑ Each edge connects either node→node or subgraph→subgraph — never mixed
+  ☑ Each subgraph contains ≤ 5 nodes
+  ☑ Node IDs are alphanumeric only (no dots, slashes, Chinese)
+  ☑ Labels with spaces/Chinese use quoted form: `ID["label text"]`
 -->
-
 ```mermaid
 flowchart TB
     subgraph {{ LAYER_1_NAME }}["{{ LAYER_1_LABEL }}"]
@@ -59,7 +59,7 @@ flowchart TB
 ## Documentation Navigation / 文档导航
 
 <!--
-  Navigation table with target audience / 导航表（含受众说明）
+  Navigation table with target audience.
   Columns: Document | Description | Audience
 -->
 
@@ -73,7 +73,7 @@ flowchart TB
 ## Core Features / 核心功能
 
 <!--
-  Feature table with links to relevant modules / 功能表（含模块链接）
+  Feature table with links to relevant modules.
   Columns: Feature | Description | Module
 -->
 
@@ -86,8 +86,8 @@ flowchart TB
 ## Quick Start / 快速开始
 
 <!--
-  Working code example with expected output / 可运行的代码示例（含预期输出）
-  Must include: import, initialization, invocation, result
+  Working code example with expected output.
+  Must include: import, initialization, invocation, result.
 -->
 
 ```{{ LANGUAGE }}

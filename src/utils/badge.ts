@@ -1,5 +1,7 @@
 /**
+ * Local Badge Generation: SVG rendering + convenient factory functions
  * 本地徽章生成：SVG 渲染 + 便捷工厂函数
+ * Avoids relying on external services like shields.io
  * 避免依赖 shields.io 等外网服务
  */
 
@@ -11,7 +13,7 @@ export interface BadgeOptions {
 }
 
 /**
- * 预定义的颜色方案
+ * Predefined color schemes / 预定义的颜色方案
  */
 export const BADGE_COLORS = {
   blue: '#007ec6',
@@ -28,7 +30,7 @@ export const BADGE_COLORS = {
  * 计算文本宽度（近似值，基于字符数）
  */
 function estimateTextWidth(text: string): number {
-  // 英文字符约 6px，数字约 7px，中文字符约 12px
+  // English chars ~6px, numbers ~7px, Chinese chars ~12px / 英文字符约 6px，数字约 7px，中文字符约 12px
   let width = 0;
   for (const char of text) {
     if (/[\u4e00-\u9fa5]/.test(char)) {
@@ -39,7 +41,7 @@ function estimateTextWidth(text: string): number {
       width += 6;
     }
   }
-  return width + 10; // 加上左右 padding
+  return width + 10; // add left/right padding / 加上左右 padding
 }
 
 /**
@@ -112,24 +114,25 @@ export function generateTextBadge(options: BadgeOptions): string {
   return `\`${options.label}: ${options.message}\``;
 }
 
+// ─── Convenient Factory Functions ────
 // ─── 便捷工厂函数 ───
 
 /**
- * 生成版本徽章
+ * Generate version badge / 生成版本徽章
  */
 export function createVersionBadge(version: string): string {
   return generateInlineBadge({ label: 'version', message: version, color: 'blue' });
 }
 
 /**
- * 生成许可证徽章
+ * Generate license badge / 生成许可证徽章
  */
 export function createLicenseBadge(license: string): string {
   return generateInlineBadge({ label: 'license', message: license, color: 'green' });
 }
 
 /**
- * 生成构建状态徽章
+ * Generate build status badge / 生成构建状态徽章
  */
 export function createBuildBadge(status: 'passing' | 'failing' | 'unknown' = 'passing'): string {
   const colorMap = { passing: 'brightgreen', failing: 'red', unknown: 'lightgrey' };
@@ -137,7 +140,7 @@ export function createBuildBadge(status: 'passing' | 'failing' | 'unknown' = 'pa
 }
 
 /**
- * 生成测试覆盖率徽章
+ * Generate test coverage badge / 生成测试覆盖率徽章
  */
 export function createCoverageBadge(coverage: number): string {
   let color = 'red';
@@ -149,21 +152,21 @@ export function createCoverageBadge(coverage: number): string {
 }
 
 /**
- * 生成语言徽章
+ * Generate language badge / 生成语言徽章
  */
 export function createLanguageBadge(language: string): string {
   return generateInlineBadge({ label: 'language', message: language, color: 'blue' });
 }
 
 /**
- * 生成自定义徽章
+ * Generate custom badge / 生成自定义徽章
  */
 export function createCustomBadge(label: string, message: string, color: string = 'blue'): string {
   return generateInlineBadge({ label, message, color });
 }
 
 /**
- * 批量生成项目徽章
+ * Batch generate project badges / 批量生成项目徽章
  */
 export interface ProjectBadges {
   version?: string;

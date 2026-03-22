@@ -2,13 +2,10 @@
 
 <!--
   This template defines the structure for module documentation.
-  本模板定义模块文档的结构。
 
   11 sections. Use module-simple.md for lightweight modules (util/config/helper).
-  共 11 个章节。轻量模块（util/config/helper）请使用 module-simple.md。
 
   Replace {{ placeholders }} with actual module content.
-  将 {{ 占位符 }} 替换为实际模块内容。
 -->
 
 ---
@@ -18,7 +15,7 @@
 ## 1. Module Overview / 模块概述
 
 <!--
-  2-3 paragraphs (NOT sentences) / 2-3 段（不是 2-3 句）
+  2-3 paragraphs (NOT sentences)
   - What the module does, why it exists, and what problem it solves
   - Technical approach and key abstractions
   - Role within the larger system
@@ -36,8 +33,8 @@
 ## 2. Architecture Position / 架构位置图
 
 <!--
-  MANDATORY: Mermaid diagram highlighting this module's position / 必须：高亮当前模块的架构位置图
-  Use style to highlight the current module
+  MANDATORY: Mermaid diagram highlighting this module's position in the system.
+  Use style to highlight the current module.
 -->
 
 ```mermaid
@@ -53,7 +50,7 @@ flowchart TB
 ## 3. Feature Table / 功能表
 
 <!--
-  Feature table with related APIs / 功能表（含相关 API）
+  Feature table with related APIs.
 -->
 
 | Feature | Description | Related API |
@@ -65,7 +62,7 @@ flowchart TB
 ## 4. File Structure / 文件结构
 
 <!--
-  File tree with responsibility descriptions / 文件树（含职责说明）
+  File tree with responsibility descriptions.
 -->
 
 ```
@@ -79,7 +76,7 @@ flowchart TB
 ## 5. Core Workflow Diagram / 核心工作流图
 
 <!--
-  MANDATORY: Mermaid flowchart / 必须：Mermaid 流程图
+  MANDATORY: Mermaid flowchart showing the core workflow.
 -->
 
 ```mermaid
@@ -98,11 +95,8 @@ flowchart TD
 ## 6. State Diagram / 状态图
 
 <!--
-  OPTIONAL: Include only for stateful modules (connection managers, order flows, workflow engines, etc.)
-  可选：仅用于有状态的模块（连接管理、订单流转、工作流引擎等）
-
+  OPTIONAL: Include only for stateful modules (connection managers, order flows, workflow engines, etc.).
   Skip this section entirely for stateless utility/transform modules.
-  无状态的工具/转换模块请跳过此节。
 
   Use Mermaid stateDiagram-v2 to show state transitions.
 -->
@@ -112,7 +106,6 @@ flowchart TD
 <!--
   API overview table only. Detailed signatures, parameters, and type definitions
   belong in the corresponding api.md file.
-  仅放 API 概览表。详细签名、参数、类型定义归 api.md 管理。
 -->
 
 | API | Type | Description |
@@ -125,8 +118,8 @@ flowchart TD
 ## 8. Usage Examples / 使用示例
 
 <!--
-  1-3 examples depending on module complexity. / 根据模块复杂度提供 1-3 个示例。
-  The first example serves as the Quick Start. / 第一个示例即为快速开始。
+  1-3 examples depending on module complexity.
+  The first example serves as the Quick Start.
 -->
 
 ### Quick Start / 快速开始
@@ -144,7 +137,7 @@ flowchart TD
 ## 9. Best Practices / 最佳实践
 
 <!--
-  Recommended and avoid patterns / 推荐做法与避免做法
+  Recommended and avoid patterns.
 -->
 
 ### Recommended / 推荐
@@ -161,10 +154,7 @@ flowchart TD
 
 <!--
   OPTIONAL: Include only for core modules with significant design choices.
-  可选：仅用于有重大技术选型或架构权衡的核心模块。
-
   Skip this section for simple util/helper modules.
-  简单的工具模块请跳过此节。
 -->
 
 | Decision | Alternatives Considered | Rationale |
@@ -174,7 +164,7 @@ flowchart TD
 ## 11. Dependencies & Related Docs / 依赖与相关文档
 
 <!--
-  Dependency diagram + cross-links / 依赖关系图 + 交叉链接
+  Dependency diagram plus cross-links to related documentation.
 -->
 
 ```mermaid

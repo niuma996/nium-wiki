@@ -130,6 +130,9 @@ flowchart TD
 
 ### 🔴 Mermaid Syntax Safety Rules (v10.9+ Compatible)
 
+> ⚠️ **These rules are enforced before every diagram generation.**
+> Skipping them causes silent render failures. Read and apply them before writing any Mermaid block.
+
 When generating Mermaid diagrams, **MUST** follow these rules to ensure error-free rendering:
 
 | Rule | Correct | Incorrect | Reason |
@@ -137,7 +140,7 @@ When generating Mermaid diagrams, **MUST** follow these rules to ensure error-fr
 | Node labels must be quoted | `A["CLI Entry"]` | `A[CLI Entry]` | Labels with spaces/non-ASCII fail without quotes |
 | Node IDs must be alphanumeric | `CoreModule["Core Module"]` | `CoreModule123["Core Module"]` | Non-ASCII IDs incompatible in some versions |
 | subgraph IDs must be English | `subgraph Core["Core Layer"]` | `subgraph CoreLayer` | Non-ASCII subgraph IDs unstable |
-| **subgraph ID 与内部 node ID 不得重名** | `subgraph CL["CLI Layer"]` + `CLI["cli.ts"]` | `subgraph CLI["CLI Layer"]` + `CLI["cli.ts"]` | subgraph ID 与 node ID 共享命名空间，重复会导致渲染错误 |
+| **subgraph ID must not duplicate internal node ID** | `subgraph CL["CLI Layer"]` + `CLI["cli.ts"]` | `subgraph CLI["CLI Layer"]` + `CLI["cli.ts"]` | subgraph ID and node ID share a namespace; duplicates cause rendering errors |
 | Escape quotes in labels with HTML entities | `A["Config &quot;key&quot;"]` | `A["Config "key""]` | Nested quotes break syntax |
 | sequenceDiagram participant IDs must be alphanumeric | `participant U as User` | `participant User123` | Non-ASCII participant IDs may error |
 | Avoid mermaid reserved words as IDs | `NodeClass["class"]` | `class["class"]` | `class` is a reserved keyword |
@@ -259,22 +262,22 @@ class ClassName {
 ### 0. CLI Commands Quick Reference
 
 ```bash
-node .claude/skills/nium-wiki/bin/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
-node .claude/skills/nium-wiki/bin/index.js analyze [path]           # Analyze project structure
-node .claude/skills/nium-wiki/bin/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
-node .claude/skills/nium-wiki/bin/index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
-node .claude/skills/nium-wiki/bin/index.js build-index [path]       # Build source ↔ doc mapping index
-node .claude/skills/nium-wiki/bin/index.js build-deps [path]        # Build import/require dependency graph
-node .claude/skills/nium-wiki/bin/index.js audit-docs <dir> [--verbose|--json]  # Check doc quality
-node .claude/skills/nium-wiki/bin/index.js serve [wiki-path]        # Start docsify server
+node bin/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
+node bin/index.js analyze [path]           # Analyze project structure
+node bin/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
+node bin/index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
+node bin/index.js build-index [path]       # Build source ↔ doc mapping index
+node bin/index.js build-deps [path]        # Build import/require dependency graph
+node bin/index.js audit-docs <dir> [--verbose|--json]  # Check doc quality
+node bin/index.js serve [wiki-path]        # Start docsify server
 ```
 
-For detailed usage, see `node .claude/skills/nium-wiki/bin/index.js --help`
+For detailed usage, see `node bin/index.js --help`
 
 ### 1. Initialization Check
 
 Check if `.nium-wiki/` exists:
-- **Not exists**: Run `node .claude/skills/nium-wiki/bin/index.js init --lang <code>` to create directory structure.
+- **Not exists**: Run `node bin/index.js init --lang <code>` to create directory structure.
   Determine `<code>` by examining the project's natural language (README, code comments, docs) and the language the user is communicating in. Use `en` if unclear.
 - **Exists**: Read `config.json` and cache, perform incremental update
 
@@ -294,7 +297,7 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 
 ### 3. Project Analysis (Deep)
 
-Run `node .claude/skills/nium-wiki/bin/index.js analyze [path]` or analyze manually:
+Run `node bin/index.js analyze [path]` or analyze manually:
 
 1. **Identify tech stack**: Check dependency manifests (e.g. package.json, requirements.txt, go.mod, Cargo.toml, pom.xml, etc.)
 2. **Find entry points**: Locate main source files (e.g. src/index.ts, main.py, main.go, main.rs, src/main/java/App.java, etc.)
@@ -324,7 +327,7 @@ Save structure to `cache/structure.json`.
 Run with `--no-update` to detect changes **without** writing the hash cache yet (hashes are committed only after wiki files are written in Step 8):
 
 ```bash
-node .claude/skills/nium-wiki/bin/index.js diff-index --no-update
+node bin/index.js diff-index --no-update
 ```
 
 - New files → create corresponding wiki docs
@@ -366,26 +369,26 @@ Not all templates are needed for every project. Apply these rules:
 | `doc-map.md` | module count >= 5 |
 
 #### 6.1 Homepage (`index.md`)
-**Template**: Read `skills/nium-wiki/templates/index.md` for full structure.
+**Template**: Read `templates/index.md` for full structure.
 
 #### 6.2 Architecture Doc (`architecture.md`)
-**Template**: Read `skills/nium-wiki/templates/architecture.md` for full structure.
+**Template**: Read `templates/architecture.md` for full structure.
 
 #### 6.3 Module Docs (`modules/<name>.md`)
-**Templates**: Read `skills/nium-wiki/templates/module.md` (core) or `skills/nium-wiki/templates/module-simple.md` (util/config/helper/test).
+**Templates**: Read `templates/module.md` (core) or `templates/module-simple.md` (util/config/helper/test).
 - **Key rule**: Detailed API signatures and type definitions belong exclusively in api.md. Module docs only contain an API overview table with a link.
 
 #### 6.4 API Docs (`api/<name>.md`)
-**Template**: Read `skills/nium-wiki/templates/api.md` for full structure.
+**Template**: Read `templates/api.md` for full structure.
 - Single source of truth for all API signatures and type definitions.
 - Mark `@deprecated` APIs with migration guidance (what to use instead).
 - Include parameter constraints where applicable (e.g. "must not be empty", "range 0-100").
 
 #### 6.5 Getting Started (`getting-started.md`)
-**Template**: Read `skills/nium-wiki/templates/getting-started.md` for full structure.
+**Template**: Read `templates/getting-started.md` for full structure.
 
 #### 6.6 Doc Map (`doc-map.md`)
-**Template**: Read `skills/nium-wiki/templates/doc-map.md` for full structure.
+**Template**: Read `templates/doc-map.md` for full structure.
 
 ### 7. Source Code Links
 
@@ -400,10 +403,10 @@ Attach navigable source links next to documented symbols:
 - Sanitize link paths and build indexes **after** wiki files are written:
 
 ```bash
-node .claude/skills/nium-wiki/bin/index.js sanitize-links
-node .claude/skills/nium-wiki/bin/index.js build-index
-node .claude/skills/nium-wiki/bin/index.js build-deps
-node .claude/skills/nium-wiki/bin/index.js diff-index
+node bin/index.js sanitize-links
+node bin/index.js build-index
+node bin/index.js build-deps
+node bin/index.js diff-index
 ```
 
 > `sanitize-links` scans all wiki `.md` files and converts any `file://` absolute paths to project-root-relative paths. **MUST** run before `build-index`.
@@ -421,7 +424,7 @@ If secondary languages are configured (e.g. `zh/en`):
 
 #### 9.1 Build Translation Task List
 
-Run `node .claude/skills/nium-wiki/bin/index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
+Run `node bin/index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
 
@@ -444,10 +447,10 @@ After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 
 After ALL files are translated:
 ```bash
-node .claude/skills/nium-wiki/bin/index.js i18n sync-memory
+node bin/index.js i18n sync-memory
 ```
 
-Run `node .claude/skills/nium-wiki/bin/index.js i18n status` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
+Run `node bin/index.js i18n status` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
 
 **Delete rule**: When deleting any file from `wiki/` (e.g. because the source file was deleted), you **MUST** also delete the corresponding file from ALL `wiki_{lang}/` directories.
 
@@ -508,7 +511,7 @@ When module count > 10, source files > 50, or LOC > 10,000, switch to batch mode
 1. **Prioritize modules** — entry points (weight 5) > dependents (4) > has docs (3) > code size (2) > recently modified (1)
 2. **Generate 1-2 modules per batch** — depth scales with complexity
 3. **Track progress** in `cache/progress.json` — record completed/pending modules and current batch number
-4. **After each batch** — run `node .claude/skills/nium-wiki/bin/index.js audit-docs .nium-wiki --verbose`, report results to user, then prompt:
+4. **After each batch** — run `node bin/index.js audit-docs .nium-wiki --verbose`, report results to user, then prompt:
    - `"continue"` — next batch
    - `"audit docs"` — re-run validation
    - `"regenerate <module>"` — redo a specific module
@@ -526,7 +529,7 @@ When existing wiki docs are outdated or below quality gate, use one of these str
 | `incremental_upgrade` | Many modules, want to keep existing content | "upgrade wiki" |
 | `targeted_upgrade` | Only specific modules need attention | "upgrade \<module\> docs" |
 
-Execution: scan existing docs with `node .claude/skills/nium-wiki/bin/index.js audit-docs`, generate an upgrade report, then re-generate failing docs batch by batch.
+Execution: scan existing docs with `node bin/index.js audit-docs`, generate an upgrade report, then re-generate failing docs batch by batch.
 
 **Version footer** — append to every generated document:
 `*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/nium-wiki) | {{ GENERATED_AT }}*`

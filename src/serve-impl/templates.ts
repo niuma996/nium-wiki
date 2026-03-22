@@ -1,4 +1,5 @@
 /**
+ * HTML Template Generation: docsify index.html
  * HTML 模板生成：docsify index.html
  */
 
@@ -27,7 +28,7 @@ export function getLangLabel(lang: string): string {
 }
 
 /**
- * 生成 docsify index.html
+ * Generate docsify index.html / 生成 docsify index.html
  */
 export function generateDocsifyIndex(projectName: string, languages?: LangOption[]): string {
   const hasMultiLang = languages && languages.length > 1;

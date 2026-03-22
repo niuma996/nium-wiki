@@ -2,10 +2,8 @@
 
 <!--
   This template defines the structure for the quick start guide.
-  本模板定义快速开始指南的结构。
 
   Replace {{ placeholders }} with actual project content.
-  将 {{ 占位符 }} 替换为实际项目内容。
 -->
 
 ---
@@ -15,7 +13,7 @@
 ## Prerequisites / 前置条件
 
 <!--
-  Prerequisites table. Add rows as needed. / 前置条件表，按需添加行。
+  Prerequisites table. Add rows as needed.
 -->
 
 | Requirement | Version | Description |
@@ -25,8 +23,8 @@
 ## Installation / 安装
 
 <!--
-  Primary installation method is required. / 主要安装方式为必填。
-  Add alternative methods only if they genuinely exist. / 仅在确实存在时添加替代方式。
+  Primary installation method is required.
+  Add alternative methods only if they genuinely exist.
 -->
 
 ### {{ INSTALL_METHOD_1 }}
@@ -37,7 +35,6 @@
 
 <!--
   OPTIONAL: Add alternative installation methods if applicable.
-  可选：如有替代安装方式则添加。
 
   ### {{ INSTALL_METHOD_2 }}
   ```bash
@@ -48,7 +45,7 @@
 ## Configuration / 配置说明
 
 <!--
-  Configuration explanation / 配置说明
+  Configuration explanation.
 -->
 
 {{ CONFIGURATION_OVERVIEW }}
@@ -66,7 +63,6 @@
 
 <!--
   At least 2 steps. Add more only if the workflow requires them.
-  至少 2 步。仅在工作流需要时添加更多步骤。
 -->
 
 ### Step 1: {{ STEP_1_TITLE }}
@@ -94,7 +90,7 @@
 ## Next Steps / 下一步
 
 <!--
-  Next steps table / 下一步表
+  Next steps table.
 -->
 
 | Topic | Description | Link |

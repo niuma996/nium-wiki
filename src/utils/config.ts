@@ -1,6 +1,9 @@
 /**
+ * Configuration File Reading and Exclusion Rule Merging
  * 配置文件读取与排除规则合并
+ * Reads .nium-wiki/config.json, merges user-defined exclude with built-in exclusion directories
  * 读取 .nium-wiki/config.json，将用户自定义 exclude 与内置排除目录合并
+ * Supports reading directory exclusion rules from .gitignore
  * 支持读取 .gitignore 中的目录排除规则
  */
 
@@ -20,7 +23,7 @@ const DEFAULT_CONFIG: NiumWikiConfig = {
   useGitignore: true,
 };
 
-/** 读取 .nium-wiki/config.json，不存在则返回默认值 */
+/** Read .nium-wiki/config.json, return default value if not exists / 读取 .nium-wiki/config.json，不存在则返回默认值 */
 export function loadConfig(projectRoot: string): NiumWikiConfig {
   const configPath = path.join(projectRoot, '.nium-wiki', 'config.json');
   if (!fs.existsSync(configPath)) return { ...DEFAULT_CONFIG };
@@ -38,8 +41,12 @@ export function loadConfig(projectRoot: string): NiumWikiConfig {
 }
 
 /**
+ * Parse directory exclusion items from .gitignore
  * 从 .gitignore 解析出目录排除项
- * 只提取目录模式（以 / 结尾或纯名称且不含通配符和扩展名），忽略取反规则和文件通配符
+ * Only extracts directory patterns (ending with / or pure name without wildcards and extensions),
+ * 只提取目录模式（以 / 结尾或纯名称且不含通配符和扩展名），
+ * ignores negation rules and file wildcards
+ * 忽略取反规则和文件通配符
  */
 function parseGitignoreDirs(projectRoot: string): string[] {
   const gitignorePath = path.join(projectRoot, '.gitignore');
@@ -53,13 +60,13 @@ function parseGitignoreDirs(projectRoot: string): string[] {
       const line = raw.trim();
       if (!line || line.startsWith('#') || line.startsWith('!')) continue;
 
-      // 显式目录模式: "dist/", "node_modules/"
+      // Explicit directory pattern: "dist/", "node_modules/" / 显式目录模式: "dist/", "node_modules/"
       if (line.endsWith('/')) {
         dirs.push(line.slice(0, -1));
         continue;
       }
 
-      // 纯名称（无通配符、无路径分隔符、无扩展名点号）视为目录名
+      // Pure name (no wildcards, no path separators, no extension dots) treated as directory name / 纯名称（无通配符、无路径分隔符、无扩展名点号）视为目录名
       if (!line.includes('*') && !line.includes('?') && !line.includes('/') && !line.includes('.')) {
         dirs.push(line);
       }
@@ -71,7 +78,7 @@ function parseGitignoreDirs(projectRoot: string): string[] {
   }
 }
 
-/** 合并内置排除目录 + config.json 用户自定义 exclude + .gitignore 目录 */
+/** Merge built-in exclusion dirs + config.json user-defined exclude + .gitignore directories / 合并内置排除目录 + config.json 用户自定义 exclude + .gitignore 目录 */
 export function getExcludeDirs(projectRoot: string): Set<string> {
   const config = loadConfig(projectRoot);
   const gitignoreDirs = config.useGitignore ? parseGitignoreDirs(projectRoot) : [];

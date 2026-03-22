@@ -1,4 +1,5 @@
 /**
+ * Sidebar Generation: Recursively scan wiki directory, generate _sidebar.md
  * 侧边栏生成：递归扫描 wiki 目录，生成 _sidebar.md
  */
 
@@ -7,7 +8,7 @@ import * as path from 'path';
 import { getTocLabels, inferLangFromDir, type TocLabels } from '../utils/i18n';
 
 /**
- * 从 markdown 文件提取 H1 标题
+ * Extract H1 title from markdown file / 从 markdown 文件提取 H1 标题
  */
 function extractTitle(filePath: string, labels: TocLabels): string {
   try {
@@ -25,6 +26,7 @@ function extractTitle(filePath: string, labels: TocLabels): string {
 }
 
 /**
+ * Recursively scan wiki directory, generate _sidebar.md content
  * 递归扫描 wiki 目录，生成 _sidebar.md 内容
  */
 export function generateSidebarMd(wikiDir: string, lang?: string): string {
@@ -87,7 +89,7 @@ export function generateSidebarMd(wikiDir: string, lang?: string): string {
 }
 
 /**
- * 目录名到显示标签的映射
+ * Map directory name to display label / 目录名到显示标签的映射
  */
 function getDirLabel(dirName: string, labels: TocLabels): string {
   const keyMap: Record<string, keyof TocLabels> = {
@@ -101,7 +103,7 @@ function getDirLabel(dirName: string, labels: TocLabels): string {
 }
 
 /**
- * 递归构建侧边栏条目
+ * Recursively build sidebar entries / 递归构建侧边栏条目
  */
 function buildSidebarRecursive(dirPath: string, relDir: string, lines: string[], depth: number, labels: TocLabels): void {
   const indent = '  '.repeat(depth);

@@ -1,5 +1,7 @@
 /**
+ * Table of Contents Generation Module
  * 目录生成模块
+ * Generates navigation TOC for wiki
  * 为 wiki 生成导航目录
  */
 

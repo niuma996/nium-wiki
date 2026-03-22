@@ -1,11 +1,13 @@
 /**
+ * Language Handler Manager
  * 语言处理管理器
+ * Responsible for registering and managing all language handler modules
  * 负责注册和管理所有语言处理模块
  */
 
 import { LanguageHandler, DirectoryDescription, VersionInfo, DocEntry, ComplexityConfig, ImportResolveConfig } from './base.js';
 
-// 预导入语言处理模块
+// Pre-import language handler modules / 预导入语言处理模块
 import { JavaScriptHandler } from './javascript.js';
 import { PythonHandler } from './python.js';
 import { GoHandler } from './go.js';
@@ -16,7 +18,7 @@ import { PhpHandler } from './php.js';
 import { DotNetHandler } from './dotnet.js';
 
 /**
- * 文件扩展名到语言的映射
+ * File extension to language mapping / 文件扩展名到语言的映射
  */
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
   // JavaScript/TypeScript
@@ -51,21 +53,21 @@ const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
 };
 
 /**
- * 语言处理管理器类
+ * Language Handler Manager class / 语言处理管理器类
  */
 export class LanguageHandlerManager {
   private static instance: LanguageHandlerManager;
   private handlers: Map<string, LanguageHandler> = new Map();
 
   /**
-   * 私有构造函数，防止外部实例化
+   * Private constructor to prevent external instantiation / 私有构造函数，防止外部实例化
    */
   private constructor() {
     this.registerHandlers();
   }
 
   /**
-   * 获取单例实例
+   * Get singleton instance / 获取单例实例
    */
   public static getInstance(): LanguageHandlerManager {
     if (!LanguageHandlerManager.instance) {
@@ -75,7 +77,7 @@ export class LanguageHandlerManager {
   }
 
   /**
-   * 注册所有语言处理模块
+   * Register all language handler modules / 注册所有语言处理模块
    */
   private registerHandlers(): void {
     const handlers = [
@@ -92,13 +94,13 @@ export class LanguageHandlerManager {
     handlers.forEach(handler => {
       const languageId = handler.getLanguageId();
       this.handlers.set(languageId, handler);
-      // 注册别名
+      // Register aliases / 注册别名
       this.registerAliases(handler);
     });
   }
 
   /**
-   * 注册语言别名
+   * Register language aliases / 注册语言别名
    */
   private registerAliases(handler: LanguageHandler): void {
     const aliases = handler.getAliases();
@@ -108,8 +110,9 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Get language handler by language ID
    * 根据语言ID获取语言处理模块
-   * @param languageId 语言标识符
+   * @param languageId Language identifier / 语言标识符
    */
   public getHandler(languageId: string): LanguageHandler | null {
     if (!languageId) {
@@ -120,7 +123,7 @@ export class LanguageHandlerManager {
   }
 
   /**
-   * 获取所有支持的语言列表（显示名称）
+   * Get list of all supported languages (display names) / 获取所有支持的语言列表（显示名称）
    */
   public getSupportedLanguages(): string[] {
     return Array.from(new Set(
@@ -129,7 +132,7 @@ export class LanguageHandlerManager {
   }
 
   /**
-   * 获取所有支持的语言ID列表
+   * Get list of all supported language IDs / 获取所有支持的语言ID列表
    */
   public getSupportedLanguageIds(): string[] {
     const ids = new Set<string>();
@@ -140,8 +143,9 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Detect language from file extension
    * 根据文件扩展名检测语言
-   * @param filePath 文件路径
+   * @param filePath File path / 文件路径
    */
   public detectLanguageFromFile(filePath: string): string | null {
     const { extname } = require('path');
@@ -150,8 +154,9 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Detect primary language used in the project from project directory
    * 根据项目目录检测主要使用的语言
-   * @param projectRoot 项目根目录
+   * @param projectRoot Project root directory / 项目根目录
    */
   public detectProjectLanguages(projectRoot: string): string[] {
     const { existsSync } = require('fs');
@@ -162,7 +167,7 @@ export class LanguageHandlerManager {
       const indicators = handler.getProjectIndicators();
       for (const indicator of indicators) {
         if (indicator.includes('*')) {
-          // 处理通配符
+          // Handle wildcards / 处理通配符
           const dir = resolve(projectRoot, indicator.split('/')[0]);
           if (existsSync(dir)) {
             try {
@@ -173,7 +178,7 @@ export class LanguageHandlerManager {
                 break;
               }
             } catch {
-              // 忽略错误
+              // Ignore errors / 忽略错误
             }
           }
         } else {
@@ -190,15 +195,16 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Get directory descriptions (by language)
    * 获取目录描述（根据语言）
-   * @param languageId 语言标识符
+   * @param languageId Language identifier / 语言标识符
    */
   public getDirectoryDescriptions(languageId: string): DirectoryDescription {
     const handler = this.getHandler(languageId);
     if (handler) {
       return handler.getDirectoryDescriptions();
     }
-    // 返回通用目录描述
+    // Return generic directory descriptions / 返回通用目录描述
     return {
       src: "源代码目录，包含所有主要的应用程序代码",
       test: "测试文件目录，包含单元测试和集成测试",
@@ -214,9 +220,10 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Detect project types (by language)
    * 检测项目类型（根据语言）
-   * @param languageId 语言标识符
-   * @param projectRoot 项目根目录
+   * @param languageId Language identifier / 语言标识符
+   * @param projectRoot Project root directory / 项目根目录
    */
   public async detectProjectTypes(
     languageId: string,
@@ -230,10 +237,11 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Find entry files (by language)
    * 查找入口文件（根据语言）
-   * @param languageId 语言标识符
-   * @param files 所有文件列表
-   * @param projectRoot 项目根目录
+   * @param languageId Language identifier / 语言标识符
+   * @param files List of all files / 所有文件列表
+   * @param projectRoot Project root directory / 项目根目录
    */
   public async findEntryPoints(
     languageId: string,
@@ -248,9 +256,10 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Detect runtime versions (by language)
    * 检测运行时版本（根据语言）
-   * @param languageId 语言标识符
-   * @param projectRoot 项目根目录
+   * @param languageId Language identifier / 语言标识符
+   * @param projectRoot Project root directory / 项目根目录
    */
   public async detectVersions(
     languageId: string,
@@ -264,9 +273,10 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Detect code standards (by language)
    * 检测代码规范（根据语言）
-   * @param languageId 语言标识符
-   * @param projectRoot 项目根目录
+   * @param languageId Language identifier / 语言标识符
+   * @param projectRoot Project root directory / 项目根目录
    */
   public async detectCodeStandards(
     languageId: string,
@@ -280,9 +290,10 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Extract documentation (auto-detect language from file)
    * 提取文档（根据文件自动检测语言）
-   * @param content 文件内容
-   * @param filePath 文件路径
+   * @param content File content / 文件内容
+   * @param filePath File path / 文件路径
    */
   public extractDocs(content: string, filePath: string): DocEntry[] {
     const languageId = this.detectLanguageFromFile(filePath);
@@ -296,7 +307,7 @@ export class LanguageHandlerManager {
   }
 
   /**
-   * 获取所有语言的源代码扩展名
+   * Get source code extensions for all languages / 获取所有语言的源代码扩展名
    */
   public getAllSourceExtensions(): string[] {
     const extensions: string[] = [];
@@ -307,7 +318,7 @@ export class LanguageHandlerManager {
   }
 
   /**
-   * 获取所有语言的测试文件扩展名
+   * Get test file extensions for all languages / 获取所有语言的测试文件扩展名
    */
   public getAllTestExtensions(): string[] {
     const extensions: string[] = [];
@@ -318,7 +329,7 @@ export class LanguageHandlerManager {
   }
 
   /**
-   * 获取所有语言的配置文件
+   * Get config files for all languages / 获取所有语言的配置文件
    */
   public getAllConfigFiles(): string[] {
     const files: string[] = [];
@@ -329,8 +340,9 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Get directory descriptions for multiple languages
    * 获取多种语言的目录描述
-   * @param languageIds 语言ID列表
+   * @param languageIds List of language IDs / 语言ID列表
    */
   public getDirectoryDescriptionsForLanguages(languageIds: string[]): DirectoryDescription {
     const mergedDescriptions: DirectoryDescription = {};
@@ -344,9 +356,10 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Detect runtime versions for multiple languages
    * 检测多种语言的运行时版本
-   * @param languageIds 语言ID列表
-   * @param projectRoot 项目根目录
+   * @param languageIds List of language IDs / 语言ID列表
+   * @param projectRoot Project root directory / 项目根目录
    */
   public async detectVersionsForLanguages(
     languageIds: string[],
@@ -363,10 +376,11 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Find entry files for multiple languages
    * 查找多种语言的入口文件
-   * @param languageIds 语言ID列表
-   * @param files 所有文件列表
-   * @param projectRoot 项目根目录
+   * @param languageIds List of language IDs / 语言ID列表
+   * @param files List of all files / 所有文件列表
+   * @param projectRoot Project root directory / 项目根目录
    */
   public async findEntryPointsForLanguages(
     languageIds: string[],
@@ -384,9 +398,10 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Detect code standards for multiple languages
    * 检测多种语言的代码规范
-   * @param languageIds 语言ID列表
-   * @param projectRoot 项目根目录
+   * @param languageIds List of language IDs / 语言ID列表
+   * @param projectRoot Project root directory / 项目根目录
    */
   public async detectCodeStandardsForLanguages(
     languageIds: string[],
@@ -403,8 +418,9 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Get complexity analysis config for a file
    * 获取文件对应的复杂度分析配置
-   * @param filePath 文件路径
+   * @param filePath File path / 文件路径
    */
   public getComplexityConfigForFile(filePath: string): ComplexityConfig | null {
     const languageId = this.detectLanguageFromFile(filePath);
@@ -418,8 +434,9 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Get import resolve config for a file
    * 获取文件对应的 import 解析配置
-   * @param filePath 文件路径
+   * @param filePath File path / 文件路径
    */
   public getImportResolveConfigForFile(filePath: string): ImportResolveConfig | null {
     const languageId = this.detectLanguageFromFile(filePath);
@@ -433,6 +450,7 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Get exclusion directories for all languages (merged and deduplicated)
    * 获取所有语言的排除目录（合并去重）
    */
   public getAllExcludeDirs(): string[] {
@@ -448,6 +466,7 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * Check if project has a frontend layer (based on detected languages and project types)
    * 检查项目是否有前端层（根据检测到的语言和项目类型）
    */
   public hasFrontendLayer(languageIds: string[], projectTypes: string[]): boolean {
@@ -462,6 +481,6 @@ export class LanguageHandlerManager {
 }
 
 /**
- * 导出语言处理管理器实例
+ * Export language handler manager instance / 导出语言处理管理器实例
  */
 export const languageHandlerManager = LanguageHandlerManager.getInstance();

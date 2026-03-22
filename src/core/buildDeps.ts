@@ -1,5 +1,7 @@
 /**
+ * Dependency Graph Analysis Module
  * 依赖图谱分析模块
+ * Parses import/require statements to build dependency graphs and computes transitive impact of changes
  * 解析 import/require 语句构建依赖图，计算变更的传递性影响
  */
 
@@ -22,7 +24,9 @@ export interface ImpactResult {
 }
 
 /**
+ * Resolve import paths, trying to complete extensions and index files
  * 解析导入路径，尝试补全扩展名和 index 文件
+ * Uses import resolution configuration provided by language handlers
  * 使用语言处理器提供的解析配置
  */
 function resolveImportPath(
@@ -34,12 +38,12 @@ function resolveImportPath(
 ): string | null {
   const absBase = path.resolve(projectRoot, fromDir, specifier);
 
-  // 直接匹配（带扩展名）
+  // Direct match (with extension) / 直接匹配（带扩展名）
   if (fs.existsSync(absBase) && fs.statSync(absBase).isFile()) {
     return path.relative(projectRoot, absBase).replace(/\\/g, '/');
   }
 
-  // 尝试补全扩展名
+  // Try to complete extensions / 尝试补全扩展名
   for (const ext of resolveExtensions) {
     const candidate = absBase + ext;
     if (fs.existsSync(candidate)) {
@@ -47,7 +51,7 @@ function resolveImportPath(
     }
   }
 
-  // 尝试目录下的 index 文件
+  // Try index files in directory / 尝试目录下的 index 文件
   if (fs.existsSync(absBase) && fs.statSync(absBase).isDirectory()) {
     for (const idx of indexFiles) {
       const candidate = path.join(absBase, idx);
@@ -61,7 +65,9 @@ function resolveImportPath(
 }
 
 /**
+ * Parse relative import statements from file content
  * 从文件内容中解析相对路径的 import 语句
+ * Automatically adapts to different language import syntax via language handlers
  * 通过语言处理器自动适配不同语言的 import 语法
  */
 export function parseImports(
@@ -78,7 +84,7 @@ export function parseImports(
   const imports: string[] = [];
 
   for (const pattern of config.importPatterns) {
-    // 重置 lastIndex 以确保全局正则从头匹配
+    // Reset lastIndex to ensure global regex starts from beginning / 重置 lastIndex 以确保全局正则从头匹配
     pattern.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(content)) !== null) {
@@ -93,7 +99,7 @@ export function parseImports(
 }
 
 /**
- * 构建项目依赖图
+ * Build project dependency graph / 构建项目依赖图
  */
 export function buildDependencyGraph(
   projectRoot: string,
@@ -102,7 +108,7 @@ export function buildDependencyGraph(
   const imports: Record<string, string[]> = {};
   const importedBy: Record<string, string[]> = {};
 
-  // 初始化所有文件
+  // Initialize all files / 初始化所有文件
   for (const file of sourceFiles) {
     imports[file] = [];
     if (!importedBy[file]) importedBy[file] = [];
@@ -136,6 +142,7 @@ export function buildDependencyGraph(
 }
 
 /**
+ * BFS to compute transitive impact of changed files
  * BFS 计算变更文件的传递性影响
  */
 export function computeTransitiveImpact(

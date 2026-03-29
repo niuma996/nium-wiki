@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { languageHandlerManager } from '../language-handlers/index.js';
+import { languageHandlerManager } from '../language-handlers/index';
 import { IGNORE_FILES } from '../utils/patterns';
 import { getExcludeDirs } from '../utils/config';
 import { walkFiles } from '../utils/fileWalker';

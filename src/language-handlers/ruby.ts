@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
-import { BaseLanguageHandler, VersionInfo, ProjectTypeDetection, ComplexityConfig, ImportResolveConfig } from './base.js';
+import { BaseLanguageHandler, VersionInfo, ProjectTypeDetection, ComplexityConfig, ImportResolveConfig } from './base';
 
 export class RubyHandler extends BaseLanguageHandler {
   getLanguageName(): string {

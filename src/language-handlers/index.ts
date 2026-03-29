@@ -5,17 +5,17 @@
  * 负责注册和管理所有语言处理模块
  */
 
-import { LanguageHandler, DirectoryDescription, VersionInfo, DocEntry, ComplexityConfig, ImportResolveConfig } from './base.js';
+import { LanguageHandler, DirectoryDescription, VersionInfo, DocEntry, ComplexityConfig, ImportResolveConfig } from './base';
 
 // Pre-import language handler modules / 预导入语言处理模块
-import { JavaScriptHandler } from './javascript.js';
-import { PythonHandler } from './python.js';
-import { GoHandler } from './go.js';
-import { RustHandler } from './rust.js';
-import { JavaHandler } from './java.js';
-import { RubyHandler } from './ruby.js';
-import { PhpHandler } from './php.js';
-import { DotNetHandler } from './dotnet.js';
+import { JavaScriptHandler } from './javascript';
+import { PythonHandler } from './python';
+import { GoHandler } from './go';
+import { RustHandler } from './rust';
+import { JavaHandler } from './java';
+import { RubyHandler } from './ruby';
+import { PhpHandler } from './php';
+import { DotNetHandler } from './dotnet';
 
 /**
  * File extension to language mapping / 文件扩展名到语言的映射

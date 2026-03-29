@@ -7,8 +7,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { languageHandlerManager } from '../language-handlers/index.js';
-import { DocEntry } from '../language-handlers/base.js';
+import { languageHandlerManager } from '../language-handlers/index';
+import { DocEntry } from '../language-handlers/base';
 
 export { DocEntry };
 

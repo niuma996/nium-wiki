@@ -273,6 +273,7 @@ class ClassName {
 node bin/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
 node bin/index.js analyze [path]           # Analyze project structure
 node bin/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
+node bin/index.js incremental [path]      # Run incremental pipeline: diff + deps + doc-index → affected docs
 node bin/index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
 node bin/index.js build-index [path]       # Build source ↔ doc mapping index
 node bin/index.js build-deps [path]        # Build import/require dependency graph
@@ -332,32 +333,31 @@ Save structure to `cache/structure.json`.
 
 ### 5. Change Detection
 
-Run with `--no-update` to detect changes **without** writing the hash cache yet (hashes are committed only after wiki files are written in Step 8):
+Use the **automated incremental pipeline** to detect changes and compute the precise list of affected docs in one step:
 
 ```bash
-node bin/index.js diff-index --no-update
+node bin/index.js incremental [--no-commit] [-v]
 ```
 
-- New files → create corresponding wiki docs
-- Modified files → refresh affected wiki docs (see Step 5.5 to locate targets)
-- Deleted files → flag as obsolete
+This runs the full pipeline: `diff-index` → `build-deps` → `build-index` → transitive-impact → doc-dep analysis. It outputs:
+- Which source files changed (+added, ~modified, -deleted)
+- Which wiki docs need regeneration (with reason: source_changed, dep_changed, doc_dep_changed, inferred)
+- Which docs will be deleted
+- Which docs are preserved (unchanged)
 
-### 5.5. Locate Target Wiki Files (incremental update only)
+**If wiki doesn't exist yet**: the pipeline automatically falls back to full-generation mode.
 
-**Skip this step on first-time generation.**
+> **IMPORTANT**: Always run `incremental` before generating, not `diff-index` alone.
+> `diff-index` only detects source changes — it does NOT map them to wiki docs.
 
-Read `.nium-wiki/cache/doc-index.json` → `sourceToDoc` field to find which wiki documents correspond to each changed source file:
+### 5.5. Target Docs (resolved by the pipeline above)
 
-```json
-// example: src/sourceIndex.ts was modified
-// doc-index.json sourceToDoc:
-{ "src/sourceIndex.ts": ["core/source-index.md", "api/source-index.md"] }
-// → update .nium-wiki/wiki/core/source-index.md and .nium-wiki/wiki/api/source-index.md
-```
+The `incremental` command in Step 5 already resolves this. Each affected doc includes:
+- `docPath`: relative wiki path (e.g. `modules/core/source-index.md`)
+- `reason`: why it needs updating
+- `triggeredBy`: source files that triggered the update
 
-If a modified file has no entry in `sourceToDoc`, infer the path by naming convention: `src/fooBar.ts` → `modules/foo-bar.md`.
-
-Optionally read `.nium-wiki/cache/dep-graph.json` → `importedBy` field to check if changed files have dependents whose docs may also need review.
+Manual fallback (if pipeline not available): Read `.nium-wiki/cache/doc-index.json` → `sourceToDoc` field. If a changed source file has no entry, infer by naming convention: `src/fooBar.ts` → `modules/foo-bar.md`, and nested paths: `src/core/analyzeProject.ts` → `modules/core/analyze-project.md`.
 
 ### 6. Content Generation (Enterprise Quality)
 

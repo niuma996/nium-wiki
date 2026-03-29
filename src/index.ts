@@ -18,6 +18,13 @@ export type { DocIndex, SourceReference } from './core/buildDocIndex';
 export { buildDependencyGraph, computeTransitiveImpact, parseImports, saveDependencyGraph, loadDependencyGraph } from './core/buildDeps';
 export type { DependencyGraph, ImpactResult } from './core/buildDeps';
 
+export {
+  buildIncrementalPlan,
+  printIncrementalPlan,
+  inferDocPathFromSource,
+} from './core/incremental';
+export type { IncrementalPlan, AffectedDoc, IncrementalOptions } from './core/incremental';
+
 export { sanitizeLinks, sanitizeContent, printSanitizeResult } from './core/sanitizeLinks';
 export type { SanitizeResult } from './core/sanitizeLinks';
 

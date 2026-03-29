@@ -8,7 +8,7 @@
  */
 
 import * as path from 'path';
-import { languageHandlerManager } from '../language-handlers/index.js';
+import { languageHandlerManager } from '../language-handlers/index';
 
 // ─── Exclusion Directories ─────────────────────────────────────────────
 // ─── 排除目录 ───────────────────────────────────────────────

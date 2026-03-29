@@ -23,6 +23,10 @@ import {
 import { generateToc, generateSidebar } from './generation/generateToc';
 import { buildDocIndex, enrichWithInference, saveDocIndex } from './core/buildDocIndex';
 import { buildDependencyGraph, saveDependencyGraph } from './core/buildDeps';
+import {
+  buildIncrementalPlan,
+  printIncrementalPlan,
+} from './core/incremental';
 import { sanitizeLinks, printSanitizeResult } from './core/sanitizeLinks';
 import {
   checkSyncStatus,
@@ -130,6 +134,34 @@ program
     } else {
       console.log('\n⚠️  Hash cache not updated (--no-update)');
     }
+  });
+
+// ── incremental ─────────────────────────────────────────
+program
+  .command('incremental')
+  .description('Build incremental update plan: diff → dep-graph → doc-index → affected docs')
+  .argument('[project-path]', 'Project root directory', process.cwd())
+  .option('--no-commit', 'Do not update hash cache after analysis')
+  .option('--max-depth <n>', 'Maximum BFS depth for transitive impact (default: 3)', '3')
+  .option('-v, --verbose', 'Show preserved docs list')
+  .action((projectPath: string, opts: { commit: boolean; maxDepth: string; verbose: boolean }) => {
+    const resolved = path.resolve(projectPath);
+    const wikiDir = path.join(resolved, '.nium-wiki');
+    if (!fs.existsSync(wikiDir)) {
+      console.error('❌ .nium-wiki directory does not exist, please run init first');
+      process.exitCode = 1;
+      return;
+    }
+
+    const plan = buildIncrementalPlan({
+      projectRoot: resolved,
+      commitHashes: opts.commit !== false,
+      maxImpactDepth: parseInt(opts.maxDepth, 10),
+      fallbackToFull: true,
+    });
+
+    printIncrementalPlan(plan, opts.verbose);
+    process.exitCode = plan.hasChanges ? 0 : 0;
   });
 
 // ── build-index ──────────────────────────────────────────

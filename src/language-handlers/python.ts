@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
-import { BaseLanguageHandler, VersionInfo, ProjectTypeDetection, DocEntry, ComplexityConfig, ImportResolveConfig } from './base.js';
+import { BaseLanguageHandler, VersionInfo, ProjectTypeDetection, DocEntry, ComplexityConfig, ImportResolveConfig } from './base';
 
 export class PythonHandler extends BaseLanguageHandler {
   /**

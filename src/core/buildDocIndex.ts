@@ -7,7 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { languageHandlerManager } from '../language-handlers/index.js';
+import { languageHandlerManager } from '../language-handlers/index';
 import { walkFiles } from '../utils/fileWalker';
 import { loadCache, saveCache } from '../utils/cache';
 
@@ -27,31 +27,68 @@ export interface DocIndex {
  * Parse source file references from markdown content
  * 从 markdown 内容中解析源文件引用
  * Matches project-root-relative paths in format [label](/src/path#L1-L100)
- * 匹配 [label](/src/path#L1-L100) 格式的项目根相对路径
+ * and relative paths [label](../src/path) and import statements in code blocks
  */
 export function parseSourceReferences(
   mdContent: string,
-  _projectRoot: string,
+  projectRoot: string,
 ): SourceReference[] {
   const refs: SourceReference[] = [];
-  // Match [label](/src/path#L1-L100) format / 匹配 [label](/src/path#L1-L100) 格式
-  const pattern = /\[.*?\]\(\/((?:src|lib|app|packages)\/.+?)(?:#L(\d+)(?:-L(\d+))?)?\)/g;
-  let match: RegExpExecArray | null;
+  const seen = new Set<string>();
 
-  while ((match = pattern.exec(mdContent)) !== null) {
-    const rawPath = match[1];
+  function addRef(file: string, lineStart?: number, lineEnd?: number) {
+    const key = `${file}:${lineStart}-${lineEnd}`;
+    if (seen.has(key)) return;
+    seen.add(key);
 
-    // Skip example/template paths / 跳过示例/模板路径
-    if (rawPath.startsWith('src/source.ts') || rawPath.startsWith('src/file.ts') ||
-        rawPath.startsWith('src/diagram.ts') || rawPath.startsWith('path/to/')) {
-      continue;
+    // Skip example/template paths
+    if (
+      file.startsWith('src/source.ts') ||
+      file.startsWith('src/file.ts') ||
+      file.startsWith('src/diagram.ts') ||
+      file.startsWith('path/to/') ||
+      file.includes('example') ||
+      file.includes('template')
+    ) {
+      return;
     }
 
-    refs.push({
-      file: rawPath,
-      lineStart: match[2] ? parseInt(match[2], 10) : undefined,
-      lineEnd: match[3] ? parseInt(match[3], 10) : undefined,
-    });
+    refs.push({ file, lineStart, lineEnd });
+  }
+
+  // Strategy 1: Standard absolute paths [label](/src/path#L1-L100)
+  const absPattern = /\[.*?\]\(\/((?:src|lib|app|packages)\/.+?)(?:#L(\d+)(?:-L(\d+))?)?\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = absPattern.exec(mdContent)) !== null) {
+    const rawPath = match[1];
+    addRef(rawPath, match[2] ? parseInt(match[2], 10) : undefined, match[3] ? parseInt(match[3], 10) : undefined);
+  }
+
+  // Strategy 2: Relative paths [label](../src/path) or [label](./src/path)
+  // These need conversion to absolute paths relative to project root
+  const relPattern = /\[.*?\]\(\.\.?\/((?:src|lib|app|packages)\/.+?)(?:#L(\d+)(?:-L(\d+))?)?\)/g;
+  while ((match = relPattern.exec(mdContent)) !== null) {
+    const rawPath = match[1];
+    addRef(rawPath, match[2] ? parseInt(match[2], 10) : undefined, match[3] ? parseInt(match[3], 10) : undefined);
+  }
+
+  // Strategy 3: Import statements inside code blocks (semantic references)
+  // e.g. `import { x } from '@/core/foo'` or `from './foo'`
+  const codeBlockPattern = /```(?:typescript|javascript|typescript\n[\s\S]*?)\n([\s\S]*?)```/g;
+  while ((match = codeBlockPattern.exec(mdContent)) !== null) {
+    const codeContent = match[1];
+    // Match various import syntaxes
+    const importPatterns = [
+      /import\s+.*?from\s+['"]((?:src|lib|app|packages)\/[^'"]+)['"]/g,
+      /import\s+['"]((?:src|lib|app|packages)\/[^'"]+)['"]/g,
+      /from\s+['"]((?:src|lib|app|packages)\/[^'"]+)['"]/g,
+    ];
+    for (const impPattern of importPatterns) {
+      let impMatch;
+      while ((impMatch = impPattern.exec(codeContent)) !== null) {
+        addRef(impMatch[1]);
+      }
+    }
   }
 
   return refs;
@@ -65,18 +102,25 @@ export function parseSourceReferences(
  * 动态从语言处理器获取支持的扩展名
  */
 export function inferDocPath(sourceFile: string): string | null {
-  // Dynamically build extension matching pattern / 动态构建扩展名匹配模式
   const allExtensions = languageHandlerManager.getAllSourceExtensions();
   const extPattern = allExtensions.map(e => e.replace('.', '\\.')).join('|');
-  // Only process top-level source files under src/ / 仅处理 src/ 下的顶层源文件
-  const regex = new RegExp(`^src/([^/]+)(${extPattern})$`);
+  // Support nested paths: src/core/analyzeProject.ts → modules/core/analyze-project.md
+  const regex = new RegExp(`^src[/\\\\](.+?)\\.(${extPattern})$`, 'i');
   const match = sourceFile.match(regex);
   if (!match) return null;
-  const baseName = match[1];
+  const fullPath = match[1]; // e.g. "core/analyzeProject" or "core/impl/diff"
+  const dirPart = path.dirname(fullPath);
+  const baseName = path.basename(fullPath);
+
   const kebab = baseName
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[\s_]+/g, '-')
     .toLowerCase();
-  return `modules/${kebab}.md`;
+
+  if (dirPart === '.') {
+    return `modules/${kebab}.md`;
+  }
+  return `modules/${dirPart.replace(/\\/g, '/')}/${kebab}.md`;
 }
 
 /**

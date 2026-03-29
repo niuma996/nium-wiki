@@ -7,7 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { languageHandlerManager } from '../language-handlers/index.js';
+import { languageHandlerManager } from '../language-handlers/index';
 import { loadCache, saveCache } from '../utils/cache';
 
 export interface DependencyGraph {

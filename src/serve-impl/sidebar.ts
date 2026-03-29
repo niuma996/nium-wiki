@@ -99,7 +99,7 @@ function getDirLabel(dirName: string, labels: TocLabels): string {
     design: 'design',
   };
   const key = keyMap[dirName.toLowerCase()];
-  return key ? labels[key] : dirName;
+  return key ? (labels[key] as string) : dirName;
 }
 
 /**

@@ -6,6 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { walkFiles } from '../utils/fileWalker';
+import { inferLangFromDir, getTocLabels } from '../utils/i18n';
 
 export interface QualityMetrics {
   filePath: string;
@@ -166,7 +167,7 @@ function generateIssues(m: QualityMetrics, emptyTitles: string[]): string[] {
   return issues;
 }
 
-export function analyzeDocument(filePath: string): QualityMetrics {
+export function analyzeDocument(filePath: string, lang?: string): QualityMetrics {
   const metrics: QualityMetrics = {
     filePath: filePath,
     lineCount: 0,
@@ -222,11 +223,12 @@ export function analyzeDocument(filePath: string): QualityMetrics {
   // 检查源码追溯 / Check source tracing
   metrics.hasSourceTracing = /\*\*Section sources\*\*|\*\*Diagram sources\*\*|file:\/\//.test(content);
 
-  // 检查关键章节 / Check key sections
+  // 检查关键章节（语言感知）/ Check key sections (language-aware)
   const lower = content.toLowerCase();
-  metrics.hasBestPractices = /最佳实践|best practice/.test(lower);
-  metrics.hasPerformance = /性能优化|性能考量|performance/.test(lower);
-  metrics.hasTroubleshooting = /错误处理|调试|故障排除|troubleshoot|debug/.test(lower);
+  const labels = getTocLabels(lang ?? 'en');
+  metrics.hasBestPractices = labels.bestPractices.some(k => lower.includes(k.toLowerCase()));
+  metrics.hasPerformance = labels.performance.some(k => lower.includes(k.toLowerCase()));
+  metrics.hasTroubleshooting = labels.troubleshooting.some(k => lower.includes(k.toLowerCase()));
 
   metrics.qualityLevel = evaluateQualityLevel(metrics);
   metrics.issues = generateIssues(metrics, emptyTitles);
@@ -252,9 +254,10 @@ export function analyzeWiki(wikiPath: string): QualityReport {
     return report;
   }
 
+  const lang = inferLangFromDir(wikiDir, 'en');
   const mdFiles = walkFiles(wikiDir, { extensions: ['.md'] });
   for (const mdFile of mdFiles) {
-    const metrics = analyzeDocument(mdFile);
+    const metrics = analyzeDocument(mdFile, lang);
     report.docs.push(metrics);
     report.totalDocs++;
 

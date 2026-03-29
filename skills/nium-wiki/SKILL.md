@@ -31,6 +31,10 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 - Supply **runnable code examples** paired with their expected output (🔴 secrets must be sanitized - see "Secret & Credential Sanitization")
 - Call out **edge cases, caveats, and common mistakes** explicitly
 
+> **Substantive content**: A section has real content if it contains ≥ 3 non-empty, non-heading
+> lines, OR at least one code block, diagram, or table. A heading followed by a single sentence
+> or a bare list does not count.
+
 ### Structural Conventions
 - Organize content with **hierarchical headings** (H2 → H3 → H4) to form a clear information hierarchy
 - Summarize key concepts in **tables** for scanability
@@ -82,6 +86,10 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 | Module dependencies | `flowchart LR` | always |
 | Data models / ORM | `erDiagram` | when project has database/ORM |
 | Module conceptual relationships | `mindmap` | optional, for abstract module relationships only (NOT file trees) |
+
+> **Diagram diversity**: Count ≥ 2 distinct diagram *types* toward the minimum. Three identical
+> flowcharts do not satisfy the requirement — use `classDiagram`, `sequenceDiagram`,
+> `stateDiagram-v2`, `erDiagram` as appropriate for the module.
 
 **Layout rules**: Choose direction by content — `TB` for hierarchies, `LR` for flows/dependencies. Use `subgraph` to group related nodes when count > 6. Apply `style` color coding to highlight key nodes.
 

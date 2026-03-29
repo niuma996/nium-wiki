@@ -36,7 +36,8 @@ interface I18nMemory {
   entries: Record<string, { hash: string; lang: string; createdAt?: string; updatedAt: string }>;
 }
 
-// ── 内置 UI 标签表（sidebar / toc 等结构性文本）/ Built-in UI labels (sidebar / toc and other structural text) ─────────────
+// ── 内置 UI 标签表（sidebar / toc 等结构性文本）/ Built-in UI labels (sidebar / toc and other structural text)
+// 以及质量检查关键词（auditDocs 使用的章节匹配正则）/ Quality check keywords used by auditDocs for section matching
 export interface TocLabels {
   toc: string;
   empty: string;
@@ -50,6 +51,10 @@ export interface TocLabels {
   design: string;
   docMap: string;
   overview: string;
+  // 质量检查关键词（小写数组，供 audit 使用）/ Quality check keywords (lowercased arrays, used by audit)
+  bestPractices: string[];
+  performance: string[];
+  troubleshooting: string[];
 }
 
 const BUILTIN_LABELS: Record<string, TocLabels> = {
@@ -60,6 +65,9 @@ const BUILTIN_LABELS: Record<string, TocLabels> = {
     modules: '模块文档', api: 'API 参考',
     guides: '使用指南', design: '设计文档',
     docMap: '文档地图', overview: '概述',
+    bestPractices: ['最佳实践', 'best practice'],
+    performance: ['性能优化', '性能考量', 'performance'],
+    troubleshooting: ['错误处理', '调试', '故障排除', 'troubleshoot', 'debug'],
   },
   en: {
     toc: 'Table of Contents', empty: 'Empty',
@@ -68,6 +76,9 @@ const BUILTIN_LABELS: Record<string, TocLabels> = {
     modules: 'Modules', api: 'API Reference',
     guides: 'Guides', design: 'Design',
     docMap: 'Doc Map', overview: 'Overview',
+    bestPractices: ['best practice', 'best practices'],
+    performance: ['performance', 'performance optimization', 'performance considerations'],
+    troubleshooting: ['troubleshoot', 'troubleshooting', 'debug', 'error handling', 'debugging'],
   },
   ja: {
     toc: '目次', empty: '空です',
@@ -76,6 +87,9 @@ const BUILTIN_LABELS: Record<string, TocLabels> = {
     modules: 'モジュール', api: 'APIリファレンス',
     guides: 'ガイド', design: '設計ドキュメント',
     docMap: 'ドキュメントマップ', overview: '概要',
+    bestPractices: ['ベストプラクティス', 'best practice'],
+    performance: ['パフォーマンス', '性能最適化', 'performance'],
+    troubleshooting: ['エラー処理', 'デバッグ', 'トラブルシューティング', 'troubleshoot'],
   },
   ko: {
     toc: '목차', empty: '비어 있음',
@@ -84,6 +98,9 @@ const BUILTIN_LABELS: Record<string, TocLabels> = {
     modules: '모듈', api: 'API 참조',
     guides: '가이드', design: '설계 문서',
     docMap: '문서 맵', overview: '개요',
+    bestPractices: ['모범 사례', 'best practice'],
+    performance: ['성능', '성능 최적화', 'performance'],
+    troubleshooting: ['오류 처리', '디버깅', '트러블슈팅', 'troubleshoot'],
   },
   fr: {
     toc: 'Table des matières', empty: 'Vide',
@@ -92,6 +109,9 @@ const BUILTIN_LABELS: Record<string, TocLabels> = {
     modules: 'Modules', api: 'Référence API',
     guides: 'Guides', design: 'Conception',
     docMap: 'Carte des documents', overview: 'Aperçu',
+    bestPractices: ['meilleures pratiques', 'best practice'],
+    performance: ['performance', 'optimisation des performances'],
+    troubleshooting: ['dépannage', 'débogage', 'gestion des erreurs', 'troubleshoot'],
   },
   de: {
     toc: 'Inhaltsverzeichnis', empty: 'Leer',
@@ -100,6 +120,9 @@ const BUILTIN_LABELS: Record<string, TocLabels> = {
     modules: 'Module', api: 'API-Referenz',
     guides: 'Anleitungen', design: 'Design',
     docMap: 'Dokumentenkarte', overview: 'Überblick',
+    bestPractices: ['best Practices', 'best practice'],
+    performance: ['leistung', 'leistungsoptimierung', 'performance'],
+    troubleshooting: ['fehlerbehandlung', 'debugging', 'troubleshooting', 'troubleshoot'],
   },
 };
 

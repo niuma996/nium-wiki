@@ -25,15 +25,6 @@ export { extractDocsFromFile, docsToMarkdown } from './core/extractDocs';
 export type { DocEntry } from './core/extractDocs';
 
 export {
-  generateArchitectureDiagram,
-  generateModuleDependencyDiagram,
-  generateFileTreeDiagram,
-  generateDataFlowDiagram,
-  generateClassDiagram,
-  loadStructure,
-} from './generation/generateDiagram';
-
-export {
   analyzeDocument,
   analyzeWiki,
   printQualityReport,

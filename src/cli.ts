@@ -2,7 +2,7 @@
 /**
  * Nium-Wiki CLI 入口 / CLI Entry Point
  * 提供所有子命令 / Provides all subcommands: init, analyze, diff-index, extract-docs,
- * generate-diagram, audit-docs, generate-toc
+ * audit-docs, generate-toc
  */
 
 import { Command } from 'commander';
@@ -15,12 +15,6 @@ import { getOsLang } from './utils/i18n';
 import { analyzeProject, printAnalysis } from './core/analyzeProject';
 import { diffSourceIndex, updateSourceIndex, printSourceDiff } from './core/sourceIndex';
 import { extractDocsFromFile, docsToMarkdown } from './core/extractDocs';
-import {
-  generateArchitectureDiagram,
-  generateFileTreeDiagram,
-  generateDataFlowDiagram,
-  loadStructure,
-} from './generation/generateDiagram';
 import {
   analyzeWiki,
   printQualityReport,
@@ -227,47 +221,6 @@ program
       return;
     }
     console.log(docsToMarkdown(entries));
-  });
-
-// ── generate-diagram ──────────────────────────────────────
-program
-  .command('generate-diagram')
-  .description('Generate Mermaid diagrams from project structure')
-  .argument('[wiki-dir]', '.nium-wiki directory path', '.nium-wiki')
-  .option('-t, --type <type>', 'Diagram type: architecture | tree | flow | class', 'architecture')
-  .option('--preview', 'Preview diagram (output to terminal)', false)
-  .action((wikiDir: string, opts: { type: string; preview: boolean }) => {
-    const resolved = path.resolve(wikiDir);
-    const structure = loadStructure(resolved);
-    if (!structure) {
-      console.error('❌ Project structure data not found, please run analyze first');
-      process.exitCode = 1;
-      return;
-    }
-
-    switch (opts.type) {
-      case 'architecture':
-        console.log('=== Architecture Diagram ===');
-        console.log(generateArchitectureDiagram(structure));
-        break;
-      case 'tree':
-        console.log('=== Directory Structure Diagram ===');
-        console.log(generateFileTreeDiagram(structure));
-        break;
-      case 'flow':
-        console.log('=== Data Flow Diagram ===');
-        console.log(generateDataFlowDiagram(
-          structure.entryPoints || [],
-          structure.modules || [],
-        ));
-        break;
-      default:
-        console.log('=== Architecture Diagram ===');
-        console.log(generateArchitectureDiagram(structure));
-        console.log();
-        console.log('=== Directory Structure Diagram ===');
-        console.log(generateFileTreeDiagram(structure));
-    }
   });
 
 // ── audit-docs ─────────────────────────────────────────

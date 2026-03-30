@@ -23,7 +23,7 @@ export {
   printIncrementalPlan,
   inferDocPathFromSource,
 } from './core/incremental';
-export type { IncrementalPlan, AffectedDoc, IncrementalOptions } from './core/incremental';
+export type { IncrementalPlan, AffectedDoc, IncrementalOptions, UpdateStrength } from './core/incremental';
 
 export { sanitizeLinks, sanitizeContent, printSanitizeResult } from './core/sanitizeLinks';
 export type { SanitizeResult } from './core/sanitizeLinks';

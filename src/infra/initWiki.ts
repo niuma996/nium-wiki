@@ -65,7 +65,7 @@ export interface InitResult {
   message: string;
 }
 
-export function initNiumWiki(projectRoot: string, force = false, primaryLang = 'en'): InitResult {
+export function initNiumWiki(projectRoot: string, force = false, primaryLang?: string): InitResult {
   const wikiDir = path.join(projectRoot, '.nium-wiki');
 
   const result: InitResult = {
@@ -74,6 +74,24 @@ export function initNiumWiki(projectRoot: string, force = false, primaryLang = '
     skipped: [],
     message: '',
   };
+
+  // When re-initializing, always read the existing config's language to avoid
+  // accidentally overwriting it with the caller's default value (e.g. 'en').
+  // This also handles the case where the CLI passes the wrong primaryLang.
+  if (force) {
+    const existingConfigPath = path.join(wikiDir, 'config.json');
+    if (fs.existsSync(existingConfigPath)) {
+      try {
+        const existing = JSON.parse(fs.readFileSync(existingConfigPath, 'utf-8'));
+        if (existing?.language) {
+          primaryLang = existing.language;
+        }
+      } catch { /* ignore — proceed with caller value */ }
+    }
+  }
+  // Use provided primaryLang, or fall back to 'zh' (not 'en') to avoid
+  // accidentally defaulting to English when language is unset.
+  const lang = primaryLang ?? 'zh';
 
   // 检查是否已存在 / Check if already exists
   if (fs.existsSync(wikiDir)) {
@@ -109,7 +127,7 @@ export function initNiumWiki(projectRoot: string, force = false, primaryLang = '
   // 创建配置文件 / Create config file
   const configPath = path.join(wikiDir, 'config.json');
   if (!fs.existsSync(configPath) || force) {
-    fs.writeFileSync(configPath, JSON.stringify(getDefaultConfig(primaryLang), null, 2), 'utf-8');
+    fs.writeFileSync(configPath, JSON.stringify(getDefaultConfig(lang), null, 2), 'utf-8');
     result.created.push('config.json');
   }
 

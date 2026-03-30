@@ -33,6 +33,8 @@ import { languageHandlerManager } from '../language-handlers/index';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export type UpdateStrength = 'full' | 'incremental';
+
 export interface AffectedDoc {
   /** Relative path within wiki/ e.g. "modules/source-index.md" */
   docPath: string;
@@ -42,6 +44,12 @@ export interface AffectedDoc {
   triggeredBy: string[];
   /** Full filesystem path */
   fullPath: string;
+  /**
+   * Hint for the generation pipeline:
+   * - 'full': document body content changed — regenerate entirely
+   * - 'incremental': only footer/timestamps should be refreshed
+   */
+  updateStrength: UpdateStrength;
 }
 
 export interface IncrementalPlan {
@@ -66,8 +74,14 @@ export interface IncrementalOptions {
   projectRoot: string;
   /** If true, update hash cache after analysis */
   commitHashes?: boolean;
-  /** Maximum BFS depth for transitive impact */
+  /** Maximum BFS depth for transitive impact (code-level dependency chain) */
   maxImpactDepth?: number;
+  /**
+   * Maximum BFS depth for doc-to-doc propagation.
+   * 1 = only direct referencers, 2 = also docs that link to direct referencers, etc.
+   * Default: 1 (conservative — avoids excessive cascade)
+   */
+  maxDocDepDepth?: number;
   /** If true, fall back to full generation when no index exists */
   fallbackToFull?: boolean;
 }
@@ -107,7 +121,13 @@ export function inferDocPathFromSource(sourceFile: string): string | null {
  * Returns a plan describing exactly which docs need updating.
  */
 export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPlan {
-  const { projectRoot, commitHashes = false, maxImpactDepth = 3, fallbackToFull = true } = options;
+  const {
+    projectRoot,
+    commitHashes = false,
+    maxImpactDepth = 3,
+    maxDocDepDepth = 1,
+    fallbackToFull = true,
+  } = options;
 
   const wikiDir = path.join(projectRoot, '.nium-wiki', 'wiki');
 
@@ -184,6 +204,9 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
 
   // Helper to register an affected doc
   function registerAffectedDoc(docPath: string, reason: AffectedDoc['reason'], triggeredBy: string) {
+    const updateStrength: UpdateStrength =
+      reason === 'source_changed' ? 'full' : 'incremental';
+
     if (!affectedDocMap.has(docPath)) {
       triggeredByMap.set(docPath, new Set());
       affectedDocMap.set(docPath, {
@@ -191,6 +214,7 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
         reason,
         triggeredBy: [],
         fullPath: path.join(wikiDir, docPath),
+        updateStrength,
       });
     }
     triggeredByMap.get(docPath)!.add(triggeredBy);
@@ -202,10 +226,13 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
     for (const doc of docs) {
       registerAffectedDoc(doc, 'source_changed', src);
     }
-    // Also check inferred path
-    const inferred = inferDocPathFromSource(src);
-    if (inferred && !docs.includes(inferred)) {
-      registerAffectedDoc(inferred, 'inferred', src);
+    // Only infer when the source file already has at least one doc mapping in the index.
+    // This avoids triggering inference for completely new/unrelated source files.
+    if (docs.length > 0) {
+      const inferred = inferDocPathFromSource(src);
+      if (inferred && !docs.includes(inferred)) {
+        registerAffectedDoc(inferred, 'inferred', src);
+      }
     }
   }
 
@@ -214,9 +241,12 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
     for (const doc of docs) {
       registerAffectedDoc(doc, 'source_changed', src);
     }
-    const inferred = inferDocPathFromSource(src);
-    if (inferred && !docs.includes(inferred)) {
-      registerAffectedDoc(inferred, 'inferred', src);
+    // Only infer when the source file already has at least one doc mapping in the index.
+    if (docs.length > 0) {
+      const inferred = inferDocPathFromSource(src);
+      if (inferred && !docs.includes(inferred)) {
+        registerAffectedDoc(inferred, 'inferred', src);
+      }
     }
   }
 
@@ -241,10 +271,10 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
     }
   }
 
-  // 4c. Process doc-to-doc dependencies (semantic impact)
+  // 4c. Process doc-to-doc dependencies (semantic impact) — limited by maxDocDepDepth
   const docDeps = buildDocToDocDependencies(wikiDir);
-  for (const [docPath, affected] of affectedDocMap) {
-    const transitiveDocDeps = getTransitiveDocDeps(docPath, docDeps);
+  for (const [docPath] of affectedDocMap) {
+    const transitiveDocDeps = getTransitiveDocDeps(docPath, docDeps, maxDocDepDepth);
     for (const dep of transitiveDocDeps) {
       if (!affectedDocMap.has(dep)) {
         registerAffectedDoc(dep, 'doc_dep_changed', docPath);
@@ -324,7 +354,10 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
 // ─── Doc-to-Doc Dependency Analysis ──────────────────────────────────────────
 
 interface DocDeps {
+  /** Which docs this doc links to (outgoing edges) */
   docToDoc: Record<string, string[]>;
+  /** Which docs link to this doc (incoming edges) — reverse index for propagation */
+  docToReferrers: Record<string, string[]>;
   docToSources: Record<string, string[]>;
 }
 
@@ -334,8 +367,9 @@ interface DocDeps {
 function buildDocToDocDependencies(wikiDir: string): DocDeps {
   const docToDoc: Record<string, string[]> = {};
   const docToSources: Record<string, string[]> = {};
+  const docToReferrers: Record<string, string[]> = {};
 
-  if (!fs.existsSync(wikiDir)) return { docToDoc, docToSources };
+  if (!fs.existsSync(wikiDir)) return { docToDoc, docToReferrers, docToSources };
 
   // Load doc index for source mapping
   const docIndex = loadDocIndex(path.dirname(wikiDir));
@@ -368,34 +402,54 @@ function buildDocToDocDependencies(wikiDir: string): DocDeps {
     }
     docToDoc[relDoc] = [...new Set(links)];
 
+    // Build reverse index: for each outgoing link, record that this doc is a referrer
+    for (const linked of links) {
+      if (!docToReferrers[linked]) docToReferrers[linked] = [];
+      if (!docToReferrers[linked].includes(relDoc)) {
+        docToReferrers[linked].push(relDoc);
+      }
+    }
+
     // Extract source references from doc
     if (docIndex) {
       docToSources[relDoc] = docIndex.docToSources[relDoc] || [];
     }
   }
 
-  return { docToDoc, docToSources };
+  return { docToDoc, docToReferrers, docToSources };
 }
 
 /**
- * Get all docs that transitively depend on the given doc.
- * Used to cascade updates through doc dependency chains.
+ * Get all docs that transitively depend on the given doc (docs that link to it,
+ * directly or through intermediate docs), up to `maxDepth` hops.
+ *
+ * Example: if A→B→C (A links to B, B links to C) and `startDoc`=A:
+ * - depth=1: returns [B]
+ * - depth=2: returns [B, C]
  */
-function getTransitiveDocDeps(startDoc: string, deps: DocDeps): string[] {
+function getTransitiveDocDeps(
+  startDoc: string,
+  deps: DocDeps,
+  maxDepth: number = 1,
+): string[] {
   const result = new Set<string>();
-  const queue = [startDoc];
+  const queue: Array<{ doc: string; depth: number }> = [{ doc: startDoc, depth: 0 }];
   const visited = new Set<string>();
 
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const { doc: current, depth } = queue.shift()!;
     if (visited.has(current)) continue;
     visited.add(current);
 
-    const dependents = deps.docToDoc[current] || [];
-    for (const dep of dependents) {
-      if (!result.has(dep)) {
-        result.add(dep);
-        queue.push(dep);
+    // Use the reverse index (docToReferrers) to find docs that link to `current`
+    const referrers = deps.docToReferrers[current] || [];
+    for (const referrer of referrers) {
+      if (!result.has(referrer)) {
+        result.add(referrer);
+        // Only enqueue if within depth budget
+        if (depth + 1 <= maxDepth) {
+          queue.push({ doc: referrer, depth: depth + 1 });
+        }
       }
     }
   }
@@ -469,7 +523,8 @@ export function printIncrementalPlan(plan: IncrementalPlan, verbose = false): vo
     for (const [reason, docs] of Object.entries(byReason)) {
       console.log(`  ${reasonLabel(reason)}:`);
       for (const doc of (docs as AffectedDoc[]).slice(0, 10)) {
-        console.log(`    - ${doc.docPath} (triggered by: ${doc.triggeredBy.slice(0, 2).join(', ')})`);
+        const strengthTag = doc.updateStrength === 'full' ? '[FULL]' : '[INCR]';
+        console.log(`    - ${doc.docPath} ${strengthTag} (triggered by: ${doc.triggeredBy.slice(0, 2).join(', ')})`);
       }
       if (docs.length > 10) {
         console.log(`      ... and ${docs.length - 10} more`);

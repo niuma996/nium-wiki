@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import { getVersion } from './utils/version';
 
 import { initNiumWiki, printInitResult } from './infra/initWiki';
-import { getOsLang } from './utils/i18n';
+import { getOsLang, loadI18nConfig } from './utils/i18n';
 import { analyzeProject, printAnalysis } from './core/analyzeProject';
 import { diffSourceIndex, updateSourceIndex, printSourceDiff } from './core/sourceIndex';
 import { extractDocsFromFile, docsToMarkdown } from './core/extractDocs';
@@ -19,6 +19,7 @@ import {
   analyzeWiki,
   printQualityReport,
   saveReportJson,
+  hasMermaidErrors,
 } from './core/auditDocs';
 import { generateToc, generateSidebar } from './generation/generateToc';
 import { buildDocIndex, enrichWithInference, saveDocIndex } from './core/buildDocIndex';
@@ -55,7 +56,15 @@ program
   .option('-l, --lang <code>', 'Primary language code (zh/en/ja/ko/fr/de), defaults to system language')
   .action((projectPath: string, opts: { force: boolean; lang?: string }) => {
     const resolved = path.resolve(projectPath);
-    const primaryLang = opts.lang || getOsLang();
+    let primaryLang = opts.lang || getOsLang();
+    // Re-init: preserve existing language from config.json instead of overwriting with system lang
+    if (opts.force && !opts.lang) {
+      const wikiDir = path.join(resolved, '.nium-wiki');
+      const existing = loadI18nConfig(wikiDir);
+      if (existing?.primaryLang) {
+        primaryLang = existing.primaryLang;
+      }
+    }
     const result = initNiumWiki(resolved, opts.force, primaryLang);
     printInitResult(result);
     process.exitCode = result.success ? 0 : 1;
@@ -262,7 +271,8 @@ program
   .argument('[wiki-path]', '.nium-wiki directory path', '.nium-wiki')
   .option('-v, --verbose', 'Show detailed issue list', false)
   .option('--json <file>', 'Save report as JSON file')
-  .action((wikiPath: string, opts: { verbose: boolean; json?: string }) => {
+  .option('--mermaid-strict', 'Exit with non-zero code when Mermaid syntax errors are found (for CI)', false)
+  .action((wikiPath: string, opts: { verbose: boolean; json?: string; mermaidStrict: boolean }) => {
     const resolved = path.resolve(wikiPath);
     if (!fs.existsSync(resolved)) {
       console.error(`❌ Path does not exist: ${resolved}`);
@@ -273,6 +283,11 @@ program
     const exitCode = printQualityReport(report, opts.verbose);
     if (opts.json) {
       saveReportJson(report, opts.json);
+    }
+    if (opts.mermaidStrict && hasMermaidErrors(report)) {
+      console.error('\n🔴 Mermaid syntax errors detected. Fix all error-level issues before merging.');
+      process.exitCode = 1;
+      return;
     }
     process.exitCode = exitCode;
   });

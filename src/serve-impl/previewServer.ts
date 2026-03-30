@@ -68,11 +68,11 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
   function resolveWikiDir(req: http.IncomingMessage): { dir: string; lang: string } {
     const cookies = parseCookie(req);
     const lang = cookies['nw_lang'];
-    if (lang && lang !== config.primaryLang) {
+    if (lang && lang !== config?.primaryLang) {
       const langDir = path.join(wikiBasePath, `wiki_${lang}`);
       if (fs.existsSync(langDir)) return { dir: langDir, lang };
     }
-    return { dir: primaryWikiDir, lang: config.primaryLang };
+    return { dir: primaryWikiDir, lang: config?.primaryLang ?? 'en' };
   }
 
   const server = http.createServer((req, res) => {
@@ -93,7 +93,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
     // API: 切换语言 / Switch language
     if (urlPath === '/_api/switch-lang') {
       const params = new URLSearchParams(query);
-      const lang = params.get('lang') || config.primaryLang;
+      const lang = params.get('lang') ?? config?.primaryLang ?? 'en';
       res.writeHead(302, {
         'Set-Cookie': `nw_lang=${lang}; Path=/; SameSite=Lax`,
         'Location': '/',

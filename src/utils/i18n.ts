@@ -11,7 +11,7 @@ import { walkFiles } from './fileWalker';
 import { loadCache, saveCache } from './cache';
 
 export interface I18nConfig {
-  primaryLang: string;
+  primaryLang: string | undefined;
   secondaryLangs: string[];
   allLangs: string[];
 }
@@ -157,23 +157,42 @@ export function inferLangFromDir(wikiDir: string, fallback = 'en'): string {
   return match ? match[1] : fallback;
 }
 
-/** 解析语言配置: "zh/en" → primaryLang='zh', secondaryLangs=['en'] / Parse language config: "zh/en" → primaryLang='zh', secondaryLangs=['en'] */
-export function loadI18nConfig(wikiPath: string): I18nConfig {
-  const configPath = path.join(wikiPath, 'config.json');
-  let primaryLang = 'en';
-  let secondaryLangs: string[] = [];
-
+/** 从 config.json 读取 primary language（仅从 .nium-wiki/config.json，不 fallback）/ Read primary language from config.json only — no fallback */
+export function getPrimaryLangFromConfig(wikiDir: string): string | undefined {
+  const wikiPath = path.isAbsolute(wikiDir) ? wikiDir : path.resolve(wikiDir);
+  const niumWikiDir = path.dirname(wikiPath); // wiki/ → .nium-wiki/, .nium-wiki/ → projectRoot
+  const configPath = path.join(niumWikiDir, 'config.json');
   if (fs.existsSync(configPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      const langStr: string = config?.language ?? '';
+      if (langStr) {
+        const parts = langStr.split('/');
+        const lang = parts[0].trim();
+        if (lang && isSupportedLang(lang)) return lang;
+      }
+    } catch { /* ignore */ }
+  }
+  return undefined;
+}
+
+/** 解析语言配置: "zh/en" → primaryLang='zh', secondaryLangs=['en']；config.json 不存在时返回 undefined / Parse language config, returns undefined if config.json is absent */
+export function loadI18nConfig(wikiPath: string): I18nConfig | undefined {
+  const configPath = path.join(wikiPath, 'config.json');
+  if (!fs.existsSync(configPath)) return undefined;
+
+  try {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     const langStr: string = config?.language ?? '';
     if (langStr) {
       const parts = langStr.split('/');
-      primaryLang = parts[0];
-      secondaryLangs = parts.slice(1);
+      const primaryLang = parts[0].trim() || undefined;
+      const secondaryLangs = parts.slice(1);
+      return { primaryLang, secondaryLangs, allLangs: primaryLang ? [primaryLang, ...secondaryLangs] : secondaryLangs };
     }
-  }
+  } catch { /* ignore */ }
 
-  return { primaryLang, secondaryLangs, allLangs: [primaryLang, ...secondaryLangs] };
+  return undefined;
 }
 
 /** 获取指定语言的 wiki 目录路径 / Get wiki directory path for specified language */
@@ -191,10 +210,10 @@ export function getAvailableLanguages(wikiBasePath: string): Array<{ lang: strin
 
   const primaryDir = path.join(wikiBasePath, 'wiki');
   if (fs.existsSync(primaryDir)) {
-    results.push({ lang: config.primaryLang, dir: primaryDir });
+    results.push({ lang: config?.primaryLang ?? 'en', dir: primaryDir });
   }
 
-  for (const lang of config.secondaryLangs) {
+  for (const lang of config?.secondaryLangs ?? []) {
     const langDir = path.join(wikiBasePath, `wiki_${lang}`);
     if (fs.existsSync(langDir)) {
       results.push({ lang, dir: langDir });
@@ -227,7 +246,7 @@ function saveMemory(wikiPath: string, memory: I18nMemory): void {
 /** 检查副语言翻译同步状态（源: wiki/, 目标: wiki_{lang}/）/ Check secondary language translation sync status (source: wiki/, target: wiki_{lang}/) */
 export function checkSyncStatus(wikiPath: string, targetLang?: string): SyncStatus[] {
   const config = loadI18nConfig(wikiPath);
-  const langs = targetLang ? [targetLang] : config.secondaryLangs;
+  const langs = targetLang ? [targetLang] : (config?.secondaryLangs ?? []);
   const memory = loadMemory(wikiPath);
 
   const sourceDir = path.join(wikiPath, 'wiki');
@@ -301,7 +320,7 @@ export function syncMemory(wikiPath: string): void {
   const now = new Date().toISOString();
 
   let updated = 0;
-  for (const lang of config.secondaryLangs) {
+  for (const lang of config?.secondaryLangs ?? []) {
     const langDir = path.join(wikiPath, `wiki_${lang}`);
     for (const file of sourceFiles) {
       const tgtPath = path.join(langDir, file);

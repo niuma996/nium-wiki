@@ -7,7 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getTocLabels, inferLangFromDir } from '../utils/i18n';
+import { getTocLabels, inferLangFromDir, getPrimaryLangFromConfig } from '../utils/i18n';
 
 function extractTitleFromMarkdown(filePath: string): string {
   try {
@@ -36,13 +36,14 @@ function listMdFiles(dir: string): string[] {
 
 export function generateToc(wikiDir: string, baseUrl = '/', lang?: string): string {
   const wikiPath = wikiDir;
+  const resolvedLang = lang ?? getPrimaryLangFromConfig(wikiPath) ?? inferLangFromDir(wikiPath);
 
   if (!fs.existsSync(wikiPath)) {
-    const labels = getTocLabels(lang ?? inferLangFromDir(wikiPath));
+    const labels = getTocLabels(resolvedLang);
     return labels.empty;
   }
 
-  const labels = getTocLabels(lang ?? inferLangFromDir(wikiPath));
+  const labels = getTocLabels(resolvedLang);
   const tocLines = [`# ${labels.toc}\n`];
 
   // 主要文档
@@ -119,7 +120,8 @@ interface SidebarItem {
 }
 
 export function generateSidebar(wikiDir: string, lang?: string): string {
-  const labels = getTocLabels(lang ?? inferLangFromDir(wikiDir));
+  const resolvedLang = lang ?? getPrimaryLangFromConfig(wikiDir) ?? inferLangFromDir(wikiDir);
+  const labels = getTocLabels(resolvedLang);
 
   const sidebar: Record<string, SidebarItem[]> = {
     '/': [

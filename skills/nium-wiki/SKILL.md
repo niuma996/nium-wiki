@@ -96,64 +96,104 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 > **File/directory structure** MUST use plain-text tree format (`├──` `└──`), NEVER use Mermaid diagrams (including `mindmap`).
 > Mermaid `mindmap` is only for showing abstract conceptual relationships between modules, never for file paths or directory trees.
 
-### 🔴 Diagram Complexity Optimization Rules
-
-When linear flowcharts exceed 6 nodes, **MUST** apply visual optimization to avoid long, narrow waterfall-style diagrams.
-
-| Node Count | Optimization Strategy | Description |
-|------------|----------------------|-------------|
-| ≤ 6 | No optimization needed | Use linear flow directly |
-| 7-12 | `subgraph` grouping | Group nodes into 2-4 subgraphs by logical phases |
-| 13-20 | Layered abstraction | High-level overview + detailed phase diagrams |
-| > 20 | Split into multiple diagrams | Each diagram focuses on one phase, linked via cross-references |
-
-**Grouping principles**:
-- Group by business phases (e.g., Initialization → Detection → Collection → Output)
-- Each `subgraph` contains 2-4 nodes, max 5
-- Connect subgraphs with concise edges to show phase transitions
-- Add semantic titles to subgraphs (e.g., `subgraph Init["Initialization Phase"]`)
-
-**Example — Optimize linear flow into grouped flow**:
-
-❌ Avoid:
-```mermaid
-flowchart TD
-    A["Step 1"] --> B["Step 2"] --> C["Step 3"] --> D["Step 4"] --> E["Step 5"] --> F["Step 6"] --> G["Step 7"] --> H["Step 8"]
-```
-
-✅ Recommended:
-```mermaid
-flowchart TD
-    subgraph Phase1["Phase 1: Preparation"]
-        A["Step 1"] --> B["Step 2"]
-    end
-    subgraph Phase2["Phase 2: Processing"]
-        C["Step 3"] --> D["Step 4"] --> E["Step 5"]
-    end
-    subgraph Phase3["Phase 3: Output"]
-        F["Step 6"] --> G["Step 7"] --> H["Step 8"]
-    end
-    Phase1 --> Phase2 --> Phase3
-```
-
 ### 🔴 Mermaid Syntax Safety Rules (v10.9+ Compatible)
 
 > ⚠️ **These rules are enforced before every diagram generation.**
-> Skipping them causes silent render failures. Read and apply them before writing any Mermaid block.
+> Skipping them causes silent render failures (blank or broken diagram). **Read and apply before writing any Mermaid block.**
 
-When generating Mermaid diagrams, **MUST** follow these rules to ensure error-free rendering:
+**Complexity grouping** (flowcharts > 6 nodes):
 
-| Rule | Correct | Incorrect | Reason |
-|------|---------|-----------|--------|
-| Node labels must be quoted | `A["CLI Entry"]` | `A[CLI Entry]` | Labels with spaces/non-ASCII fail without quotes |
-| Node IDs must be alphanumeric | `CoreModule["Core Module"]` | `CoreModule123["Core Module"]` | Non-ASCII IDs incompatible in some versions |
-| subgraph IDs must be English | `subgraph Core["Core Layer"]` | `subgraph CoreLayer` | Non-ASCII subgraph IDs unstable |
-| **subgraph ID must not duplicate internal node ID** | `subgraph CL["CLI Layer"]` + `CLI["cli.ts"]` | `subgraph CLI["CLI Layer"]` + `CLI["cli.ts"]` | subgraph ID and node ID share a namespace; duplicates cause rendering errors |
-| Escape quotes in labels with HTML entities | `A["Config &quot;key&quot;"]` | `A["Config "key""]` | Nested quotes break syntax |
-| sequenceDiagram participant IDs must be alphanumeric | `participant U as User` | `participant User123` | Non-ASCII participant IDs may error |
-| Avoid mermaid reserved words as IDs | `NodeClass["class"]` | `class["class"]` | `class` is a reserved keyword |
+| Nodes | Strategy |
+|-------|----------|
+| ≤ 6 | Linear — no grouping needed |
+| 7-12 | `subgraph` grouping (2-4 per group, max 5) |
+| 13-20 | Layered abstraction (overview + detail) |
+| > 20 | Split into multiple diagrams |
 
-**One-line principle**: IDs in English, labels in quotes, special chars as HTML entities.
+**Rule 1 — Node labels must be quoted:**
+
+```mermaid
+%% WRONG — unquoted labels with spaces break rendering
+flowchart TD
+    A[CLI Entry] --> B[Source Index]
+
+%% CORRECT — all labels quoted
+flowchart TD
+    A["CLI Entry"] --> B["Source Index"]
+```
+
+**Rule 2 — Node IDs must be alphanumeric only:**
+
+```mermaid
+%% WRONG — non-alphanumeric ID
+CoreModule.123["Core Module"]
+
+%% CORRECT
+CoreModule["Core Module"]
+```
+
+**Rule 3 — subgraph IDs must be English alphanumeric (no Chinese/non-ASCII):**
+
+```mermaid
+%% WRONG — non-ASCII subgraph ID
+subgraph 核心层["Core Layer"]
+
+%% CORRECT — English alphanumeric subgraph ID
+subgraph CoreLayer["Core Layer"]
+```
+
+**Rule 4 — subgraph ID must not collide with node ID namespace (shared namespace):**
+
+```mermaid
+%% WRONG — subgraph ID "CLI" collides with node ID "CLI"
+flowchart TB
+    subgraph CLI["CLI Layer"]
+        CLI["cli.ts"] --> C2["commands"]
+    end
+    CLI["cli.ts"] --> A["Analyzer"]  %% ERROR: CLI already used as subgraph ID
+
+%% CORRECT — subgraph ID distinct from all node IDs
+flowchart TB
+    subgraph CL["CLI Layer"]
+        CLI["cli.ts"] --> C2["commands"]
+    end
+    CLI["cli.ts"] --> A["Analyzer"]
+    CL --> A
+```
+
+**Rule 5 — Inner quotes must use HTML entities:**
+
+```mermaid
+%% WRONG — unescaped nested quotes
+A["Config "key" value"]
+
+%% CORRECT — escaped with &quot;
+A["Config &quot;key&quot; value"]
+```
+
+**Rule 6 — sequenceDiagram participants must be alphanumeric:**
+
+```mermaid
+%% WRONG — non-alphanumeric participant ID
+participant User_123
+
+%% CORRECT
+participant User as U
+```
+
+**Rule 7 — Avoid Mermaid reserved words as bare IDs:**
+
+```mermaid
+%% WRONG — "class" is a reserved word
+class["class"]
+
+%% CORRECT — rename to avoid conflict
+NodeClass["class"]
+```
+
+**One-line principle**: IDs: English alphanumeric | Labels: always quoted | Special chars: HTML entities.
+
+> **Full reference**: [mermaid-syntax.md](./refs/mermaid-syntax.md) — comprehensive cheat sheet for edge cases
 
 ### 🔴 MANDATORY: Source File Back-References
 
@@ -277,7 +317,7 @@ node bin/index.js incremental [path]      # Run incremental pipeline: diff + dep
 node bin/index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
 node bin/index.js build-index [path]       # Build source ↔ doc mapping index
 node bin/index.js build-deps [path]        # Build import/require dependency graph
-node bin/index.js audit-docs <dir> [--verbose|--json]  # Check doc quality
+node bin/index.js audit-docs <dir> [--verbose|--json|--mermaid-strict]  # Check doc quality
 node bin/index.js serve [wiki-path]        # Start docsify server
 ```
 
@@ -349,6 +389,7 @@ This runs the full pipeline: `diff-index` → `build-deps` → `build-index` →
 
 > **IMPORTANT**: Always run `incremental` before generating, not `diff-index` alone.
 > `diff-index` only detects source changes — it does NOT map them to wiki docs.
+> After `incremental` completes, always check i18n sync status (Step 8 "After saving, sync secondary languages") before declaring the update done.
 
 ### 5.5. Target Docs (resolved by the pipeline above)
 
@@ -424,6 +465,18 @@ node bin/index.js diff-index
 
 - Refresh `meta.json` timestamp
 
+### After saving, sync secondary languages
+
+Run `node bin/index.js i18n status` to check if any secondary language files need updating.
+
+If secondary languages are configured AND there are `Outdated` or `Missing` files:
+1. Translate all `Outdated` and `Missing` files per Step 9.2
+2. Run `node bin/index.js i18n sync-memory`
+
+If no secondary languages are configured, skip this step.
+
+> **This step applies to both full generation and incremental updates.** Every time `wiki/` is modified, secondary language files in `wiki_{lang}/` that correspond to changed docs must be kept in sync — do not leave them stale.
+
 ### 9. Multi-language Translation
 
 **Skip this step if `language` contains only one language.**
@@ -435,6 +488,9 @@ If secondary languages are configured (e.g. `zh/en`):
 Run `node bin/index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
+
+> **Incremental mode**: If this is a partial update (incremental pipeline detected changes), only translate files that are `Outdated` or `Missing` — do NOT re-translate all `Synced` files.
+> **Full generation mode**: Translate all `Missing` files (`Outdated` may not exist yet since memory has not been populated).**
 
 #### 9.2 Translate Files One by One
 
@@ -519,10 +575,11 @@ When module count > 10, source files > 50, or LOC > 10,000, switch to batch mode
 1. **Prioritize modules** — entry points (weight 5) > dependents (4) > has docs (3) > code size (2) > recently modified (1)
 2. **Generate 1-2 modules per batch** — depth scales with complexity
 3. **Track progress** in `cache/progress.json` — record completed/pending modules and current batch number
-4. **After each batch** — run `node bin/index.js audit-docs .nium-wiki --verbose`, report results to user, then prompt:
+4. **After each batch** — run `node bin/index.js audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
    - `"continue"` — next batch
    - `"audit docs"` — re-run validation
    - `"regenerate <module>"` — redo a specific module
+   - If `--mermaid-strict` reports errors: **fix them before continuing** — Mermaid syntax errors degrade the diagram catalog silently and accumulate technical debt.
 5. **Resume** — when user says "continue wiki generation", read `cache/progress.json` and pick up where you left off
 
 ---
@@ -537,7 +594,7 @@ When existing wiki docs are outdated or below quality gate, use one of these str
 | `incremental_upgrade` | Many modules, want to keep existing content | "upgrade wiki" |
 | `targeted_upgrade` | Only specific modules need attention | "upgrade \<module\> docs" |
 
-Execution: scan existing docs with `node bin/index.js audit-docs`, generate an upgrade report, then re-generate failing docs batch by batch.
+Execution: scan existing docs with `node bin/index.js audit-docs --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
 
 **Version footer** — append to every generated document:
 `*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/nium-wiki) | {{ GENERATED_AT }}*`

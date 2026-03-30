@@ -73,6 +73,7 @@ export {
   getTocLabels,
   inferLangFromDir,
   getOsLang,
+  getPrimaryLangFromConfig,
   isSupportedLang,
 } from './utils/i18n';
 export type { I18nConfig, TocLabels } from './utils/i18n';

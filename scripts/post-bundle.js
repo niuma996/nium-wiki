@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const BIN_DIR = path.join(__dirname, '..', 'skills', 'nium-wiki', 'bin');
+const BIN_DIR = path.join(__dirname, '..', 'skills', 'nium-wiki', 'scripts');
 
 let removed = 0;
 

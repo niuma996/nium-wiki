@@ -309,30 +309,40 @@ class ClassName {
 
 ## Workflow
 
-### 0. CLI Commands Quick Reference
+### 0. Navigate to the CLI Directory
+
+**IMPORTANT**: Claude Code runs Bash commands from the project root directory. Before running any CLI command, you MUST first change into the skill's `scripts/` directory so that all subsequent commands resolve correctly.
 
 ```bash
-node bin/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
-node bin/index.js analyze [path]           # Analyze project structure
-node bin/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
-node bin/index.js incremental [path]      # Run incremental pipeline: diff + deps + doc-index → affected docs
-node bin/index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
-node bin/index.js build-index [path]       # Build source ↔ doc mapping index
-node bin/index.js build-deps [path]        # Build import/require dependency graph
-node bin/index.js audit-docs <dir> [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
-node bin/index.js serve [wiki-path]        # Start docsify server
+cd scripts
 ```
 
-For detailed usage, see `node bin/index.js --help`
+After this `cd`, all CLI commands below run from within the skill directory. The `index.js` entry point will correctly resolve paths relative to the skill location, regardless of where the skill is installed (`.trae/`, `.claude/`, `skills/`, etc.).
 
-### 1. Initialization Check
+### 1. CLI Commands Quick Reference
+
+```bash
+cd scripts && node index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
+cd scripts && node index.js analyze [path]           # Analyze project structure
+cd scripts && node index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
+cd scripts && node index.js incremental [path]      # Run incremental pipeline: diff + deps + doc-index → affected docs
+cd scripts && node index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
+cd scripts && node index.js build-index [path]       # Build source ↔ doc mapping index
+cd scripts && node index.js build-deps [path]        # Build import/require dependency graph
+cd scripts && node index.js audit-docs <dir> [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
+cd scripts && node index.js serve [wiki-path]        # Start docsify server
+```
+
+For detailed usage, see `cd scripts && node index.js --help`
+
+### 2. Initialization Check
 
 Check if `.nium-wiki/` exists:
-- **Not exists**: Run `node bin/index.js init --lang <code>` to create directory structure.
+- **Not exists**: Run `cd scripts && node index.js init --lang <code>` to create directory structure.
   Determine `<code>` by examining the project's natural language (README, code comments, docs) and the language the user is communicating in. Use `en` if unclear.
 - **Exists**: Read `config.json` and cache, perform incremental update
 
-### 2. Language Configuration
+### 3. Language Configuration
 
 Read `.nium-wiki/config.json` and extract the `language` setting.
 Format is slash-separated: the first language is the **primary language** (e.g. `zh`, `en`, `zh/en`).
@@ -346,9 +356,9 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 > - If `language` is `en`: headings should be `## Architecture Preview`, NOT `## Architecture Preview / 架构预览`
 > - If `language` is `zh`: headings should be `## 架构预览`, NOT `## Architecture Preview / 架构预览`
 
-### 3. Project Analysis (Deep)
+### 4. Project Analysis (Deep)
 
-Run `node bin/index.js analyze [path]` or analyze manually:
+Run `cd scripts && node index.js analyze [path]` or analyze manually:
 
 1. **Identify tech stack**: Check dependency manifests (e.g. package.json, requirements.txt, go.mod, Cargo.toml, pom.xml, etc.)
 2. **Find entry points**: Locate main source files (e.g. src/index.ts, main.py, main.go, main.rs, src/main/java/App.java, etc.)
@@ -357,7 +367,7 @@ Run `node bin/index.js analyze [path]` or analyze manually:
 
 Save structure to `cache/structure.json`.
 
-### 4. Deep Code Analysis (CRITICAL)
+### 5. Deep Code Analysis (CRITICAL)
 
 **IMPORTANT**: For every module, read the actual source code — do not rely on file names or directory structure alone:
 
@@ -373,12 +383,12 @@ Save structure to `cache/structure.json`.
 4. **Map relationships**: Module dependencies, call graphs, data flow
 5. **Flag complexity hotspots**: Functions with deep nesting (> 4 levels), high branching (> 10 conditions), or excessive length (> 100 LOC). Document these in module docs with logic explanations and refactoring suggestions.
 
-### 5. Change Detection
+### 6. Change Detection
 
 Use the **automated incremental pipeline** to detect changes and compute the precise list of affected docs in one step:
 
 ```bash
-node bin/index.js incremental [--no-commit] [-v]
+cd scripts && node index.js incremental [--no-commit] [-v]
 ```
 
 This runs the full pipeline: `diff-index` → `build-deps` → `build-index` → transitive-impact → doc-dep analysis. It outputs:
@@ -393,7 +403,7 @@ This runs the full pipeline: `diff-index` → `build-deps` → `build-index` →
 > `diff-index` only detects source changes — it does NOT map them to wiki docs.
 > After `incremental` completes, always check i18n sync status (Step 8 "After saving, sync secondary languages") before declaring the update done.
 
-### 5.5. Target Docs (resolved by the pipeline above)
+### 6.5. Target Docs (resolved by the pipeline above)
 
 The `incremental` command in Step 5 already resolves this. Each affected doc includes:
 - `docPath`: relative wiki path (e.g. `modules/core/source-index.md`)
@@ -402,7 +412,7 @@ The `incremental` command in Step 5 already resolves this. Each affected doc inc
 
 Manual fallback (if pipeline not available): Read `.nium-wiki/cache/doc-index.json` → `sourceToDoc` field. If a changed source file has no entry, infer by naming convention: `src/fooBar.ts` → `modules/foo-bar.md`, and nested paths: `src/core/analyzeProject.ts` → `modules/core/analyze-project.md`.
 
-### 6. Content Generation (Enterprise Quality)
+### 7. Content Generation (Enterprise Quality)
 
 Generate content adhering to the **quality gate** defined above:
 
@@ -441,23 +451,23 @@ Not all templates are needed for every project. Apply these rules:
 #### 6.6 Doc Map (`doc-map.md`)
 **Template**: Read `templates/doc-map.md` for full structure.
 
-### 7. Source Code Links
+### 8. Source Code Links
 
 Attach navigable source links next to documented symbols:
 ```markdown
 ### `functionName` [📄](/src/file.ts#L42)
 ```
 
-### 8. Save
+### 9. Save
 
 - Write wiki files to `.nium-wiki/wiki/`
 - Sanitize link paths and build indexes **after** wiki files are written:
 
 ```bash
-node bin/index.js sanitize-links
-node bin/index.js build-index
-node bin/index.js build-deps
-node bin/index.js diff-index
+cd scripts && node index.js sanitize-links
+cd scripts && node index.js build-index
+cd scripts && node index.js build-deps
+cd scripts && node index.js diff-index
 ```
 
 > `sanitize-links` scans all wiki `.md` files and converts any `file://` absolute paths to project-root-relative paths. **MUST** run before `build-index`.
@@ -469,11 +479,11 @@ node bin/index.js diff-index
 
 ### After saving, sync secondary languages
 
-Run `node bin/index.js i18n status` to check if any secondary language files need updating.
+Run `cd scripts && node index.js i18n status` to check if any secondary language files need updating.
 
 If secondary languages are configured AND there are `Outdated` or `Missing` files:
 1. Translate all `Outdated` and `Missing` files per Step 9.2
-2. Run `node bin/index.js i18n sync-memory`
+2. Run `cd scripts && node index.js i18n sync-memory`
 
 If no secondary languages are configured, skip this step.
 
@@ -481,7 +491,7 @@ If no secondary languages are configured, skip this step.
 >
 > **Relationship with Step 9**: Step 8 is the *gate* (checks what needs syncing). Step 9 is the *execution* (performs the translation). Step 8 invokes Step 9 logic when files are `Outdated` or `Missing`.
 
-### 9. Multi-language Translation
+### 10. Multi-language Translation
 
 **Skip this step if `language` contains only one language.**
 
@@ -489,7 +499,7 @@ If secondary languages are configured (e.g. `zh/en`):
 
 #### 9.1 Build Translation Task List
 
-Run `node bin/index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
+Run `cd scripts && node index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
 
@@ -515,10 +525,10 @@ After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 
 After ALL files are translated:
 ```bash
-node bin/index.js i18n sync-memory
+cd scripts && node index.js i18n sync-memory
 ```
 
-Run `node bin/index.js i18n status` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
+Run `cd scripts && node index.js i18n status` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
 
 **Delete rule**: When deleting any file from `wiki/` (e.g. because the source file was deleted), you **MUST** also delete the corresponding file from ALL `wiki_{lang}/` directories.
 
@@ -527,24 +537,39 @@ Run `node bin/index.js i18n status` again to verify all files show as `Synced`. 
 ## Surgical Edit: Modifying Existing Docs
 
 > **Applies when**: Updating 1-3 existing wiki documents (incremental pipeline result), not full generation.
+>
+> When an existing doc already exists, your goal is to **patch the minimum surface area**, not regenerate the full file. Every line you leave untouched is a line that does not need to be reviewed, diffed, or reverted.
 
-When an existing doc already exists, your goal is to **patch the minimum surface area**, not regenerate the full file. Every line you leave untouched is a line that does not need to be reviewed, diffed, or reverted.
-
-### Principle 1 — Read First, Then Patch
+### Mandatory Steps (Execute in Order)
 
 **Never start from the template when updating an existing doc.**
 
-```
-1. Read the EXISTING wiki doc      ← preserved baseline
-2. Read the changed source file(s)
-3. Diff: which sections of the doc are affected by the source change?
-4. Patch: rewrite ONLY those affected sections
-5. Write: output the minimal diff — changed sections only
-```
+**Step 1 — Read the baseline**
+- read_file: the existing wiki doc (read-only, this is what you are preserving)
+- read_file: all source files that triggered the update (from `incremental` output)
 
-If a section's source has not changed and the existing description is accurate, **leave it untouched**. The template is a guide, not a target.
+**Step 2 — Evaluate match degree**
+Cross-read the existing doc against the changed source files. Answer:
+- Which sections of the existing doc directly correspond to the changed code?
+- Which sections are completely unaffected?
+- What is your overall match degree?
 
-### Principle 2 — Preservation Priority
+**Step 3 — Decide strategy by match degree**
+
+| Match degree | Signals | Action |
+|---|---|---|
+| **≥ 80%** | Internal change only (comment, variable rename, refactor); function signatures unchanged; core topics not touched | Update version footer only — do not touch the body |
+| **40–80%** | One function's behavior changed; new export added; file structure changed | Patch only the affected sections — leave everything else untouched |
+| **< 40%** | Function renamed or signature changed; module role changed; multiple sections invalidated | Full regeneration of this document |
+
+**Step 4 — Write the patched doc**
+- Output MUST be a minimal diff from the original — significantly smaller than a full regeneration
+- Do not use the module template as the starting point for an existing doc
+
+**Step 5 — Self-verify**
+Before finalizing, mentally check: does the new file differ from the original in anything beyond the source-change-affected sections, newly-added sections, and now-incorrect sections? If yes, you are rewriting too much — restore the preserved sections.
+
+### Principle 1 — Preservation Priority
 
 Unless the source has actually changed, the following MUST be preserved exactly as-is:
 
@@ -558,7 +583,7 @@ Unless the source has actually changed, the following MUST be preserved exactly 
 | Best practices section | Never (unless the module logic changed) |
 | Cross-links | Only when linked docs were moved/renamed |
 
-### Principle 3 — Change Scope Isolation
+### Principle 2 — Change Scope Isolation
 
 Before editing, write down the minimum scope:
 
@@ -584,6 +609,25 @@ Change type → Minimum doc impact
    → Do NOT restructure the entire section
 ```
 
+### Principle 3 — Match Degree Evaluation Guide
+
+When evaluating match degree, use these concrete signals:
+
+**High match (≥ 80%) — signals:**
+- Changed code is internal implementation detail (comment, variable rename, refactor)
+- Doc describes concepts/topics that the change does not touch
+- Function signature unchanged; only body logic shifted
+
+**Medium match (40–80%) — signals:**
+- Changed code affects one function's behavior → that function's section needs update
+- New export added → append to API table, leave other sections intact
+- File added/removed → update file structure tree only
+
+**Low match (< 40%) — signals:**
+- Function renamed or signature changed → rewrite that function's section
+- Module role changed (e.g. core → utility) → full regeneration needed
+- Multiple sections invalidated → regenerate the whole doc
+
 ### Principle 4 — When in Doubt, Don't Touch
 
 A common failure mode is rewriting a correct paragraph "for better wording" — this creates a large diff with no factual improvement.
@@ -598,19 +642,6 @@ Rule:
 
 If the description is merely "not ideal" but still correct, leave it alone. A smaller diff is always better than a prettier paragraph.
 
-### Principle 5 — Document-Level Review Before Writing
-
-Before writing the final file, do a mental diff:
-
-```
-Does the new file differ from the existing file in MORE than:
-  - The source-change-affected sections?
-  - The newly-added sections?
-  - The now-incorrect sections?
-
-If YES → you are rewriting too much. Go back and restore the preserved sections.
-```
-
 ### Anti-Patterns (What Not to Do)
 
 | Anti-pattern | Why it's wrong |
@@ -621,6 +652,14 @@ If YES → you are rewriting too much. Go back and restore the preserved section
 | Regenerate Mermaid diagrams unnecessarily | Diagram was fine before |
 | "Improve" existing descriptions | Accurate = leave alone |
 | Rephrase file structure tree | Only update when structure changed |
+
+### HARDCODEd RULES — Violation is a Bug
+
+- **You MUST read the existing doc before writing anything to it**
+- **You MUST NOT regenerate a Mermaid diagram if its underlying source has not changed**
+- **You MUST NOT rewrite a paragraph that remains accurate**
+- **You MUST NOT rewrite a code example whose code has not changed**
+- **You MUST NOT use the module template as the starting point for an existing doc**
 
 ---
 
@@ -679,7 +718,7 @@ When module count > 10, source files > 50, or LOC > 10,000, switch to batch mode
 1. **Prioritize modules** — entry points (weight 5) > dependents (4) > has docs (3) > code size (2) > recently modified (1)
 2. **Generate 1-2 modules per batch** — depth scales with complexity
 3. **Track progress** in `cache/progress.json` — record completed/pending modules and current batch number
-4. **After each batch** — run `node bin/index.js audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
+4. **After each batch** — run `cd scripts && node index.js audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
    - `"continue"` — next batch
    - `"audit docs"` — re-run validation
    - `"regenerate <module>"` — redo a specific module
@@ -698,7 +737,7 @@ When existing wiki docs are outdated or below quality gate, use one of these str
 | `incremental_upgrade` | Many modules, want to keep existing content | "upgrade wiki" |
 | `targeted_upgrade` | Only specific modules need attention | "upgrade \<module\> docs" |
 
-Execution: scan existing docs with `node bin/index.js audit-docs --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
+Execution: scan existing docs with `cd scripts && node index.js audit-docs --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
 
 **Version footer** — append to every generated document:
 `*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/nium-wiki) | {{ GENERATED_AT }}*`

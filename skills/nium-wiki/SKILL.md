@@ -81,7 +81,7 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 |--------------|--------------|-----------|
 | System architecture | `flowchart TB` with subgraphs | always |
 | Request / data flow | `sequenceDiagram` | always |
-| Lifecycle / state transitions | `stateDiagram-v2` | always |
+| Lifecycle / state transitions | `stateDiagram-v2` | only for stateful modules |
 | **Class / Interface shape** | `classDiagram` with properties + methods | always |
 | Module dependencies | `flowchart LR` | always |
 | Data models / ORM | `erDiagram` | when project has database/ORM |
@@ -90,6 +90,8 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 > **Diagram diversity**: Count ≥ 2 distinct diagram *types* toward the minimum. Three identical
 > flowcharts do not satisfy the requirement — use `classDiagram`, `sequenceDiagram`,
 > `stateDiagram-v2`, `erDiagram` as appropriate for the module.
+>
+> **Note**: `mindmap` is optional and does **not** count toward the ≥ 2 distinct types requirement. It may supplement but never replace the required diagram types above.
 
 **Layout rules**: Choose direction by content — `TB` for hierarchies, `LR` for flows/dependencies. Use `subgraph` to group related nodes when count > 6. Apply `style` color coding to highlight key nodes.
 
@@ -214,7 +216,7 @@ NodeClass["class"]
 
 | Module Role | Doc Depth | Code Examples | Diagrams |
 |-------------|-----------|---------------|----------|
-| core | Comprehensive (use `module.md`) | 3+ | 2+ |
+| core | Comprehensive (use `module.md`) | 5+ | 2+ |
 | util / config | Concise (use `module-simple.md`) | 1-2 | 1 |
 | test / example | Minimal (use `module-simple.md`) | 1 | optional |
 
@@ -280,7 +282,7 @@ Every code example must:
 2. **Cover exported interfaces**: At least 1 example per major exported API
 3. **Include comments**: Explain key steps and design intent
 4. **Match project language**: Follow language best practices
-5. **Tiered examples for core APIs**: Three levels — basic usage, advanced usage, and error handling
+5. **Tiered examples for core APIs** (minimum 5 examples per core doc): Three levels — basic usage, advanced usage, and error handling — for each major exported function
 6. **Sanitized secrets**: NO actual credentials — use placeholders (see "Secret & Credential Sanitization" above)
 
 ### 🔴 MANDATORY: classDiagram for Every Core Class
@@ -317,7 +319,7 @@ node bin/index.js incremental [path]      # Run incremental pipeline: diff + dep
 node bin/index.js diff-index [path]        # Detect file changes (--no-update to skip hash write)
 node bin/index.js build-index [path]       # Build source ↔ doc mapping index
 node bin/index.js build-deps [path]        # Build import/require dependency graph
-node bin/index.js audit-docs <dir> [--verbose|--json|--mermaid-strict]  # Check doc quality
+node bin/index.js audit-docs <dir> [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
 node bin/index.js serve [wiki-path]        # Start docsify server
 ```
 
@@ -476,6 +478,8 @@ If secondary languages are configured AND there are `Outdated` or `Missing` file
 If no secondary languages are configured, skip this step.
 
 > **This step applies to both full generation and incremental updates.** Every time `wiki/` is modified, secondary language files in `wiki_{lang}/` that correspond to changed docs must be kept in sync — do not leave them stale.
+>
+> **Relationship with Step 9**: Step 8 is the *gate* (checks what needs syncing). Step 9 is the *execution* (performs the translation). Step 8 invokes Step 9 logic when files are `Outdated` or `Missing`.
 
 ### 9. Multi-language Translation
 
@@ -517,6 +521,106 @@ node bin/index.js i18n sync-memory
 Run `node bin/index.js i18n status` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
 
 **Delete rule**: When deleting any file from `wiki/` (e.g. because the source file was deleted), you **MUST** also delete the corresponding file from ALL `wiki_{lang}/` directories.
+
+---
+
+## Surgical Edit: Modifying Existing Docs
+
+> **Applies when**: Updating 1-3 existing wiki documents (incremental pipeline result), not full generation.
+
+When an existing doc already exists, your goal is to **patch the minimum surface area**, not regenerate the full file. Every line you leave untouched is a line that does not need to be reviewed, diffed, or reverted.
+
+### Principle 1 — Read First, Then Patch
+
+**Never start from the template when updating an existing doc.**
+
+```
+1. Read the EXISTING wiki doc      ← preserved baseline
+2. Read the changed source file(s)
+3. Diff: which sections of the doc are affected by the source change?
+4. Patch: rewrite ONLY those affected sections
+5. Write: output the minimal diff — changed sections only
+```
+
+If a section's source has not changed and the existing description is accurate, **leave it untouched**. The template is a guide, not a target.
+
+### Principle 2 — Preservation Priority
+
+Unless the source has actually changed, the following MUST be preserved exactly as-is:
+
+| Content type | When to update |
+|---|---|
+| Accurate description paragraphs | Never (unless source logic changed) |
+| Correct code examples | Never (unless the code itself changed) |
+| Mermaid diagrams | Never (unless the underlying flow/calls changed) |
+| File structure tree | Only when files were added/removed |
+| API summary table | Only when function signatures changed |
+| Best practices section | Never (unless the module logic changed) |
+| Cross-links | Only when linked docs were moved/renamed |
+
+### Principle 3 — Change Scope Isolation
+
+Before editing, write down the minimum scope:
+
+```
+Change type → Minimum doc impact
+
+1. Function logic changed (signature unchanged)
+   → Update only that function's description paragraph
+   → Code example only if the behavior changed
+   → Do NOT rewrite other functions' descriptions
+
+2. New exported function added
+   → Append one row to the API summary table
+   → Add one usage example (optional)
+   → Do NOT rewrite existing examples
+
+3. File added/removed
+   → Update the File Structure tree
+   → Do NOT regenerate Architecture Position diagram (unless the module's position actually changed)
+
+4. Bug fix (doc described old/wrong behavior)
+   → Fix only the affected paragraph
+   → Do NOT restructure the entire section
+```
+
+### Principle 4 — When in Doubt, Don't Touch
+
+A common failure mode is rewriting a correct paragraph "for better wording" — this creates a large diff with no factual improvement.
+
+Rule:
+
+> **If the existing description is accurate and not outdated, preserve it exactly.**
+> "Accurate" means: correctly describes what the code does.
+> "Not outdated" means: the code has not changed in a way that contradicts the description.
+>
+> Do not rewrite for stylistic preference, different phrasing, or "cleaner" expression.
+
+If the description is merely "not ideal" but still correct, leave it alone. A smaller diff is always better than a prettier paragraph.
+
+### Principle 5 — Document-Level Review Before Writing
+
+Before writing the final file, do a mental diff:
+
+```
+Does the new file differ from the existing file in MORE than:
+  - The source-change-affected sections?
+  - The newly-added sections?
+  - The now-incorrect sections?
+
+If YES → you are rewriting too much. Go back and restore the preserved sections.
+```
+
+### Anti-Patterns (What Not to Do)
+
+| Anti-pattern | Why it's wrong |
+|---|---|
+| Regenerate full file from template | Creates massive diff for no reason |
+| Rewrite all code examples | Even correct examples get rephrased |
+| Reorder sections | Changes the diff noise, no factual benefit |
+| Regenerate Mermaid diagrams unnecessarily | Diagram was fine before |
+| "Improve" existing descriptions | Accurate = leave alone |
+| Rephrase file structure tree | Only update when structure changed |
 
 ---
 

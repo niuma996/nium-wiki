@@ -87,7 +87,21 @@ interface ExpectedMetrics {
   minExamples: number;
 }
 
-function calculateExpectedMetrics(filePath: string): ExpectedMetrics {
+/**
+ * 推断模块角色：优先从 wiki 目录结构推断，否则退化到文件名关键词检测。
+ * Inference order: explicit role > wiki directory path > filename keyword.
+ */
+function inferRoleFromWikiPath(wikiDir: string, filePath: string): string {
+  const rel = path.relative(wikiDir, filePath).replace(/\\/g, '/');
+  const firstDir = rel.split('/')[0];
+
+  // 顶级目录名直接映射（目录结构比文件名更权威）
+  if (['core', 'internal'].includes(firstDir)) return 'core';
+  // 其他顶级目录（api/, serve/, commands/ 等）按 filename 检测
+  return 'auto';
+}
+
+function calculateExpectedMetrics(filePath: string, role?: string): ExpectedMetrics {
   const expected: ExpectedMetrics = {
     minLines: 100,
     minSections: 6,
@@ -95,31 +109,50 @@ function calculateExpectedMetrics(filePath: string): ExpectedMetrics {
     minExamples: 2,
   };
 
-  const fileName = path.basename(filePath, '.md').toLowerCase();
-
-  const coreKeywords = ['core', 'agent', 'editor', 'store', 'main', 'client'];
-  const isCore = coreKeywords.some(kw => fileName.includes(kw));
-
-  const utilKeywords = ['util', 'helper', 'common', 'shared', 'constant', 'config', 'type'];
-  const isUtil = utilKeywords.some(kw => fileName.includes(kw));
-
-  const isIndex = ['index', '_index', 'toc', 'doc-map'].includes(fileName);
-
-  if (isCore) {
+  // 显式 role 优先（CLI --role 参数覆盖一切推断）
+  if (role === 'core') {
     expected.minLines = 200;
     expected.minSections = 8;
     expected.minDiagrams = 2;
     expected.minExamples = 3;
-  } else if (isUtil) {
+  } else if (role === 'utility') {
     expected.minLines = 80;
     expected.minSections = 5;
     expected.minDiagrams = 1;
     expected.minExamples = 2;
-  } else if (isIndex) {
+  } else if (role === 'index') {
     expected.minLines = 50;
     expected.minSections = 3;
     expected.minDiagrams = 1;
     expected.minExamples = 0;
+  } else {
+    // 退化：文件名关键词检测（原有逻辑）
+    const fileName = path.basename(filePath, '.md').toLowerCase();
+
+    const coreKeywords = ['core', 'agent', 'editor', 'store', 'main', 'client'];
+    const isCore = coreKeywords.some(kw => fileName.includes(kw));
+
+    const utilKeywords = ['util', 'helper', 'common', 'shared', 'constant', 'config', 'type'];
+    const isUtil = utilKeywords.some(kw => fileName.includes(kw));
+
+    const isIndex = ['index', '_index', 'toc', 'doc-map'].includes(fileName);
+
+    if (isCore) {
+      expected.minLines = 200;
+      expected.minSections = 8;
+      expected.minDiagrams = 2;
+      expected.minExamples = 3;
+    } else if (isUtil) {
+      expected.minLines = 80;
+      expected.minSections = 5;
+      expected.minDiagrams = 1;
+      expected.minExamples = 2;
+    } else if (isIndex) {
+      expected.minLines = 50;
+      expected.minSections = 3;
+      expected.minDiagrams = 1;
+      expected.minExamples = 0;
+    }
   }
 
   return expected;
@@ -141,9 +174,16 @@ function countEmptySections(lines: string[]): { count: number; titles: string[] 
   return { count: emptyTitles.length, titles: emptyTitles };
 }
 
-function generateIssues(m: QualityMetrics, emptyTitles: string[]): string[] {
+function generateIssues(
+  m: QualityMetrics,
+  emptyTitles: string[],
+  wikiDir: string | undefined,
+  explicitRole?: string,
+): string[] {
   const issues: string[] = [];
-  const expected = calculateExpectedMetrics(m.filePath);
+  // 推断顺序: explicit role > 目录结构 > 文件名
+  const role = explicitRole ?? (wikiDir ? inferRoleFromWikiPath(wikiDir, m.filePath) : 'auto');
+  const expected = calculateExpectedMetrics(m.filePath, role);
 
   if (m.lineCount < expected.minLines) {
     issues.push(`Insufficient lines: ${m.lineCount}/${expected.minLines} (based on module complexity)`);
@@ -378,7 +418,12 @@ export function checkMermaidSyntax(content: string): MermaidIssue[] {
   return allIssues;
 }
 
-export function analyzeDocument(filePath: string, lang?: string): QualityMetrics {
+export function analyzeDocument(
+  filePath: string,
+  lang?: string,
+  explicitRole?: string,
+  wikiDir?: string,
+): QualityMetrics {
   const metrics: QualityMetrics = {
     filePath: filePath,
     lineCount: 0,
@@ -446,12 +491,15 @@ export function analyzeDocument(filePath: string, lang?: string): QualityMetrics
   metrics.hasTroubleshooting = labels.troubleshooting.some(k => lower.includes(k.toLowerCase()));
 
   metrics.qualityLevel = evaluateQualityLevel(metrics);
-  metrics.issues = generateIssues(metrics, emptyTitles);
+  metrics.issues = generateIssues(metrics, emptyTitles, wikiDir, explicitRole);
 
   return metrics;
 }
 
-export function analyzeWiki(wikiPath: string): QualityReport {
+export function analyzeWiki(wikiPath: string, defaultRole?: string): QualityReport {
+  // Resolve relative paths to absolute — fs.existsSync('.nium-wiki/wiki') would resolve
+  // from cwd, which may not be the project root (e.g. when called from a skill context).
+  const resolvedWikiPath = path.isAbsolute(wikiPath) ? wikiPath : path.resolve(wikiPath);
   const report: QualityReport = {
     wikiPath: wikiPath,
     checkTime: new Date().toISOString(),
@@ -463,7 +511,7 @@ export function analyzeWiki(wikiPath: string): QualityReport {
     summaryIssues: [],
   };
 
-  const wikiDir = path.join(wikiPath, 'wiki');
+  const wikiDir = path.join(resolvedWikiPath, 'wiki');
   if (!fs.existsSync(wikiDir)) {
     report.summaryIssues.push(`Wiki directory does not exist: ${wikiDir}`);
     return report;
@@ -472,7 +520,7 @@ export function analyzeWiki(wikiPath: string): QualityReport {
   const lang = getPrimaryLangFromConfig(wikiDir) ?? inferLangFromDir(wikiDir);
   const mdFiles = walkFiles(wikiDir, { extensions: ['.md'] });
   for (const mdFile of mdFiles) {
-    const metrics = analyzeDocument(mdFile, lang);
+    const metrics = analyzeDocument(mdFile, lang, defaultRole, wikiDir);
     report.docs.push(metrics);
     report.totalDocs++;
 

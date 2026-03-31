@@ -272,14 +272,16 @@ program
   .option('-v, --verbose', 'Show detailed issue list', false)
   .option('--json <file>', 'Save report as JSON file')
   .option('--mermaid-strict', 'Exit with non-zero code when Mermaid syntax errors are found (for CI)', false)
-  .action((wikiPath: string, opts: { verbose: boolean; json?: string; mermaidStrict: boolean }) => {
+  .option('--role <role>', 'Default module role for quality expectations (overrides auto-detection): core | utility | index | auto', 'auto')
+  .action((wikiPath: string, opts: { verbose: boolean; json?: string; mermaidStrict: boolean; role: string }) => {
     const resolved = path.resolve(wikiPath);
     if (!fs.existsSync(resolved)) {
       console.error(`❌ Path does not exist: ${resolved}`);
       process.exitCode = 1;
       return;
     }
-    const report = analyzeWiki(resolved);
+    const role = opts.role === 'auto' ? undefined : opts.role;
+    const report = analyzeWiki(resolved, role);
     const exitCode = printQualityReport(report, opts.verbose);
     if (opts.json) {
       saveReportJson(report, opts.json);

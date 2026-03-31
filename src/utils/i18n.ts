@@ -159,7 +159,9 @@ export function inferLangFromDir(wikiDir: string, fallback = 'en'): string {
 
 /** 从 config.json 读取 primary language（仅从 .nium-wiki/config.json，不 fallback）/ Read primary language from config.json only — no fallback */
 export function getPrimaryLangFromConfig(wikiDir: string): string | undefined {
-  const wikiPath = path.isAbsolute(wikiDir) ? wikiDir : path.resolve(wikiDir);
+  // Resolve relative paths first — path.dirname('.nium-wiki') returns '.', not the parent,
+  // which would make the config lookup point to projectRoot/config.json instead.
+  const wikiPath = path.resolve(wikiDir);
   const niumWikiDir = path.dirname(wikiPath); // wiki/ → .nium-wiki/, .nium-wiki/ → projectRoot
   const configPath = path.join(niumWikiDir, 'config.json');
   if (fs.existsSync(configPath)) {

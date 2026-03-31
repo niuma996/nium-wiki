@@ -176,10 +176,11 @@ A["Config &quot;key&quot; value"]
 **Rule 6 — sequenceDiagram participants must be alphanumeric:**
 
 ```mermaid
-%% WRONG — non-alphanumeric participant ID
-participant User_123
+%% WRONG — non-alphanumeric participant ID (dot is not allowed)
+participant User.123
 
-%% CORRECT
+%% CORRECT — alphanumeric only (underscore is allowed)
+participant User_123
 participant User as U
 ```
 
@@ -335,20 +336,33 @@ cd scripts && node index.js serve [wiki-path]        # Start docsify server
 
 For detailed usage, see `cd scripts && node index.js --help`
 
-### 2. Initialization Check
+### 2. Language Detection (MANDATORY)
+
+> **⚠️ CRITICAL: This step must be completed BEFORE any other operation.**
+
+Before running any CLI commands or generating any documentation:
+
+1. Check if `.nium-wiki/config.json` exists
+2. **If exists**: Read the `language` field — this is the **primary documentation language** and the **source of truth**
+3. **If not exists**: You will set it when running `init --lang <code>` (determine from project's natural language + user conversation language)
+
+> **Rule**: The `language` field in `config.json` is the **only authoritative source** for documentation language.
+> Do NOT infer language from source code comments, README, file names, or conversation context.
+
+### 3. Initialization Check
 
 Check if `.nium-wiki/` exists:
 - **Not exists**: Run `cd scripts && node index.js init --lang <code>` to create directory structure.
   Determine `<code>` by examining the project's natural language (README, code comments, docs) and the language the user is communicating in. Use `en` if unclear.
 - **Exists**: Read `config.json` and cache, perform incremental update
 
-### 3. Language Configuration
+### 4. Language Configuration
 
 Read `.nium-wiki/config.json` and extract the `language` setting.
 Format is slash-separated: the first language is the **primary language** (e.g. `zh`, `en`, `zh/en`).
 
 - Generate **all primary documentation** in the primary language to `.nium-wiki/wiki/`.
-- If secondary languages are configured (e.g. `zh/en` means primary=zh, secondary=en), after primary docs are written, translate all wiki documents into `wiki_{lang}/` directories (e.g. `.nium-wiki/wiki_en/`). See **Step 9** for details.
+- If secondary languages are configured (e.g. `zh/en` means primary=zh, secondary=en), after primary docs are written, translate all wiki documents into `wiki_{lang}/` directories (e.g. `.nium-wiki/wiki_en/`). See **Step 12** for details.
 
 > **Convention**: `wiki/` = primary language, `wiki_{lang}/` = secondary language. The translated directory must mirror the exact same structure and filenames as `wiki/`.
 
@@ -356,7 +370,7 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 > - If `language` is `en`: headings should be `## Architecture Preview`, NOT `## Architecture Preview / 架构预览`
 > - If `language` is `zh`: headings should be `## 架构预览`, NOT `## Architecture Preview / 架构预览`
 
-### 4. Project Analysis (Deep)
+### 5. Project Analysis (Deep)
 
 Run `cd scripts && node index.js analyze [path]` or analyze manually:
 
@@ -367,7 +381,7 @@ Run `cd scripts && node index.js analyze [path]` or analyze manually:
 
 Save structure to `cache/structure.json`.
 
-### 5. Deep Code Analysis (CRITICAL)
+### 6. Deep Code Analysis (CRITICAL)
 
 **IMPORTANT**: For every module, read the actual source code — do not rely on file names or directory structure alone:
 
@@ -383,7 +397,7 @@ Save structure to `cache/structure.json`.
 4. **Map relationships**: Module dependencies, call graphs, data flow
 5. **Flag complexity hotspots**: Functions with deep nesting (> 4 levels), high branching (> 10 conditions), or excessive length (> 100 LOC). Document these in module docs with logic explanations and refactoring suggestions.
 
-### 6. Change Detection
+### 7. Change Detection
 
 Use the **automated incremental pipeline** to detect changes and compute the precise list of affected docs in one step:
 
@@ -403,7 +417,7 @@ This runs the full pipeline: `diff-index` → `build-deps` → `build-index` →
 > `diff-index` only detects source changes — it does NOT map them to wiki docs.
 > After `incremental` completes, always check i18n sync status (Step 8 "After saving, sync secondary languages") before declaring the update done.
 
-### 6.5. Target Docs (resolved by the pipeline above)
+### 8. Target Docs (resolved by the pipeline above)
 
 The `incremental` command in Step 5 already resolves this. Each affected doc includes:
 - `docPath`: relative wiki path (e.g. `modules/core/source-index.md`)
@@ -412,11 +426,20 @@ The `incremental` command in Step 5 already resolves this. Each affected doc inc
 
 Manual fallback (if pipeline not available): Read `.nium-wiki/cache/doc-index.json` → `sourceToDoc` field. If a changed source file has no entry, infer by naming convention: `src/fooBar.ts` → `modules/foo-bar.md`, and nested paths: `src/core/analyzeProject.ts` → `modules/core/analyze-project.md`.
 
-### 7. Content Generation (Enterprise Quality)
+### 9. Content Generation (Enterprise Quality)
+
+> **🔴 MANDATORY: Language from config.json**
+>
+> Before generating ANY documentation content, you MUST read `.nium-wiki/config.json` and extract the `language` field.
+> Use this language for **ALL** documentation in `wiki/` — do NOT infer language from source code comments, README, or user conversation.
+> See **Step 4** for supported language codes and output conventions.
+>
+> **Wrong**: "Source code is in English, so I'll generate English docs"
+> **Correct**: "config.json says `language: "zh"`, so I generate Chinese docs"
 
 Generate content adhering to the **quality gate** defined above:
 
-#### 6.0 Template Selection Rules
+#### 10.1 Template Selection Rules
 
 Not all templates are needed for every project. Apply these rules:
 
@@ -429,36 +452,36 @@ Not all templates are needed for every project. Apply these rules:
 | `api.md` | project exports programmatic APIs (functions/classes/types) |
 | `doc-map.md` | module count >= 5 |
 
-#### 6.1 Homepage (`index.md`)
+#### 10.2 Homepage (`index.md`)
 **Template**: Read `templates/index.md` for full structure.
 
-#### 6.2 Architecture Doc (`architecture.md`)
+#### 10.3 Architecture Doc (`architecture.md`)
 **Template**: Read `templates/architecture.md` for full structure.
 
-#### 6.3 Module Docs (`modules/<name>.md`)
+#### 10.4 Module Docs (`modules/<name>.md`)
 **Templates**: Read `templates/module.md` (core) or `templates/module-simple.md` (util/config/helper/test).
 - **Key rule**: Detailed API signatures and type definitions belong exclusively in api.md. Module docs only contain an API overview table with a link.
 
-#### 6.4 API Docs (`api/<name>.md`)
+#### 10.5 API Docs (`api/<name>.md`)
 **Template**: Read `templates/api.md` for full structure.
 - Single source of truth for all API signatures and type definitions.
 - Mark `@deprecated` APIs with migration guidance (what to use instead).
 - Include parameter constraints where applicable (e.g. "must not be empty", "range 0-100").
 
-#### 6.5 Getting Started (`getting-started.md`)
+#### 10.6 Getting Started (`getting-started.md`)
 **Template**: Read `templates/getting-started.md` for full structure.
 
-#### 6.6 Doc Map (`doc-map.md`)
+#### 10.7 Doc Map (`doc-map.md`)
 **Template**: Read `templates/doc-map.md` for full structure.
 
-### 8. Source Code Links
+### 10. Source Code Links
 
 Attach navigable source links next to documented symbols:
 ```markdown
 ### `functionName` [📄](/src/file.ts#L42)
 ```
 
-### 9. Save
+### 11. Save
 
 - Write wiki files to `.nium-wiki/wiki/`
 - Sanitize link paths and build indexes **after** wiki files are written:
@@ -477,27 +500,13 @@ cd scripts && node index.js diff-index
 
 - Refresh `meta.json` timestamp
 
-### After saving, sync secondary languages
+### 12. Multi-language Translation
 
-Run `cd scripts && node index.js i18n status` to check if any secondary language files need updating.
-
-If secondary languages are configured AND there are `Outdated` or `Missing` files:
-1. Translate all `Outdated` and `Missing` files per Step 9.2
-2. Run `cd scripts && node index.js i18n sync-memory`
-
-If no secondary languages are configured, skip this step.
-
-> **This step applies to both full generation and incremental updates.** Every time `wiki/` is modified, secondary language files in `wiki_{lang}/` that correspond to changed docs must be kept in sync — do not leave them stale.
+> **Applies to both full generation and incremental updates.** Every time `wiki/` is modified, secondary language files in `wiki_{lang}/` that correspond to changed docs must be kept in sync — do not leave them stale.
 >
-> **Relationship with Step 9**: Step 8 is the *gate* (checks what needs syncing). Step 9 is the *execution* (performs the translation). Step 8 invokes Step 9 logic when files are `Outdated` or `Missing`.
+> **Skip this step if `language` contains only one language.**
 
-### 10. Multi-language Translation
-
-**Skip this step if `language` contains only one language.**
-
-If secondary languages are configured (e.g. `zh/en`):
-
-#### 9.1 Build Translation Task List
+#### 12.1 Build Translation Task List
 
 Run `cd scripts && node index.js i18n status` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
@@ -506,7 +515,7 @@ Run `cd scripts && node index.js i18n status` to get the sync report. Extract ev
 > **Incremental mode**: If this is a partial update (incremental pipeline detected changes), only translate files that are `Outdated` or `Missing` — do NOT re-translate all `Synced` files.
 > **Full generation mode**: Translate all `Missing` files (`Outdated` may not exist yet since memory has not been populated).**
 
-#### 9.2 Translate Files One by One
+#### 12.2 Translate Files One by One
 
 **🔴 MANDATORY: Process EVERY file in the checklist sequentially.**
 
@@ -521,7 +530,7 @@ After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 
 > **Batching rule**: If the file count exceeds 10, translate in batches of 5. After each batch, report progress and continue immediately — do NOT stop or ask the user unless you hit a context limit. If you must stop, clearly list the remaining untranslated files so the user can say "continue" to resume.
 
-#### 9.3 Finalize
+#### 12.3 Finalize
 
 After ALL files are translated:
 ```bash
@@ -539,6 +548,33 @@ Run `cd scripts && node index.js i18n status` again to verify all files show as 
 > **Applies when**: Updating 1-3 existing wiki documents (incremental pipeline result), not full generation.
 >
 > When an existing doc already exists, your goal is to **patch the minimum surface area**, not regenerate the full file. Every line you leave untouched is a line that does not need to be reviewed, diffed, or reverted.
+
+### 🔴 Quality Gate Disabled During Incremental Updates
+
+> **⚠️ CRITICAL**: When running in incremental mode (triggered by `incremental` pipeline), the
+> **global Quality Gate rules above do NOT apply** to existing docs being surgically patched.
+> Applying those rules blindly is the primary cause of oversized diffs and unnecessary rewrites.
+
+**What the global Quality Gate controls — and what incremental mode does instead:**
+
+| Global Quality Gate Rule | Incremental Mode Behavior |
+|--------------------------|--------------------------|
+| ≥ 5 code examples per core doc | Add **0–1 example** only when a new API is introduced by the changed source |
+| ≥ 2 distinct diagram types per doc | **Do NOT regenerate any diagram** — preserve existing diagrams unchanged |
+| Full 11-section `module.md` template | **Patch only the affected section(s)** listed in `triggeredBy` |
+| Every class must have a `classDiagram` | **Skip** unless the class itself was modified |
+| API summary must cover all exports | **Only cover exports that changed** |
+| ≥ 400 lines per core doc | **No minimum** — a 50-line targeted patch is preferable to a 400-line rewrite |
+
+**`updateStrength` from the `incremental` pipeline controls patch depth:**
+
+| `updateStrength` | Meaning | Action |
+|-----------------|---------|--------|
+| `full` | Source directly changed (function body, signature, etc.) | Regenerate this doc fully, apply quality gate |
+| `incremental` | Transitive/dep/doc-dep propagation | **Surgical patch only** — no quality gate, no template |
+
+> **Rule**: If the pipeline says `updateStrength: incremental` for a doc, treat it as a targeted
+> patch — update only the section that mentions the triggering source, leave everything else untouched.
 
 ### Mandatory Steps (Execute in Order)
 

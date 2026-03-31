@@ -140,7 +140,7 @@ export function buildDocIndex(projectRoot: string): DocIndex {
       const relDoc = path.relative(wikiDir, mdFile).replace(/\\/g, '/');
       const refs = parseSourceReferences(content, projectRoot);
 
-      const sourceFiles = [...new Set(refs.map(r => r.file))];
+      const sourceFiles = [...new Set(refs.map(r => r.file))].filter(f => !f.endsWith('/'));
       if (sourceFiles.length > 0) {
         docToSources[relDoc] = sourceFiles;
       }

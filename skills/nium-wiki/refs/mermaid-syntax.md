@@ -11,7 +11,7 @@ When linear flowcharts exceed 6 nodes, **MUST** apply visual optimization to avo
 | Node Count | Optimization Strategy | Description |
 |------------|----------------------|-------------|
 | <= 6 | No optimization needed | Use linear flow directly |
-| 7-12 | `subgraph` grouping | Group nodes into 2-4 subgraphs by logical phases |
+| 7-12 | `subgraph` grouping | Group into subgraphs: 2–4 nodes each, max 5 |
 | 13-20 | Layered abstraction | High-level overview + detailed phase diagrams |
 | > 20 | Split into multiple diagrams | Each diagram focuses on one phase, linked via cross-references |
 
@@ -67,10 +67,11 @@ flowchart TD
 Use only `[a-zA-Z0-9_]` in node IDs. Non-ASCII characters in IDs cause compatibility issues.
 
 ```mermaid
-%% WRONG — non-alphanumeric ID
-CoreModule_123["Core Module"]
+%% WRONG — non-alphanumeric ID (dot and Chinese characters are not allowed)
+CoreModule.123["Core Module"]
 
-%% CORRECT
+%% CORRECT — alphanumeric only (underscore is allowed)
+CoreModule_123["Core Module"]
 CoreModule["Core Module"]
 ```
 
@@ -122,11 +123,11 @@ A["Config &quot;key&quot; value"]
 Participant IDs in `sequenceDiagram` must be alphanumeric.
 
 ```mermaid
-%% WRONG — non-alphanumeric participant ID
-participant User_123
+%% WRONG — non-alphanumeric participant ID (dot is not allowed)
+participant User.123
 
-%% CORRECT
-participant User123
+%% CORRECT — alphanumeric only (underscore is allowed)
+participant User_123
 participant User as User123
 ```
 

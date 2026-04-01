@@ -112,36 +112,40 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 | 13-20 | Layered abstraction (overview + detail) |
 | > 20 | Split into multiple diagrams |
 
-**Rule 1 — Node labels must be quoted:**
+**Rule 1 — Node labels: no quotes around plain labels:**
+
+Mermaid's `ID[label]` format does **not** use quotes around plain labels.
 
 ```mermaid
-%% WRONG — unquoted labels with spaces break rendering
+%% WRONG — quoted plain label triggers audit-docs rule 6 error
+%% A["CLI Entry"]
+
+%% CORRECT — plain unquoted labels
 flowchart TD
     A[CLI Entry] --> B[Source Index]
-
-%% CORRECT — all labels quoted
-flowchart TD
-    A["CLI Entry"] --> B["Source Index"]
 ```
 
 **Rule 2 — Node IDs must be alphanumeric only:**
 
 ```mermaid
 %% WRONG — non-alphanumeric ID
-CoreModule.123["Core Module"]
+flowchart TD
+    CoreModule.123[Core Module]
 
 %% CORRECT
-CoreModule["Core Module"]
+flowchart TD
+    CoreModule_123[Core Module]
+    CoreModule[Core Module]
 ```
 
 **Rule 3 — subgraph IDs must be English alphanumeric (no Chinese/non-ASCII):**
 
 ```mermaid
 %% WRONG — non-ASCII subgraph ID
-subgraph 核心层["Core Layer"]
+subgraph 核心层[Core Layer]
 
 %% CORRECT — English alphanumeric subgraph ID
-subgraph CoreLayer["Core Layer"]
+subgraph CoreLayer[Core Layer]
 ```
 
 **Rule 4 — subgraph ID must not collide with node ID namespace (shared namespace):**
@@ -149,28 +153,30 @@ subgraph CoreLayer["Core Layer"]
 ```mermaid
 %% WRONG — subgraph ID "CLI" collides with node ID "CLI"
 flowchart TB
-    subgraph CLI["CLI Layer"]
-        CLI["cli.ts"] --> C2["commands"]
+    subgraph CLI[CLI Layer]
+        CLI_node[cli.ts] --> C2[commands]
     end
-    CLI["cli.ts"] --> A["Analyzer"]  %% ERROR: CLI already used as subgraph ID
+    CLI_node --> A[Analyzer]  %% ERROR: CLI already used as subgraph ID
 
 %% CORRECT — subgraph ID distinct from all node IDs
 flowchart TB
-    subgraph CL["CLI Layer"]
-        CLI["cli.ts"] --> C2["commands"]
+    subgraph CL[CLI Layer]
+        CLI_node[cli.ts] --> C2[commands]
     end
-    CLI["cli.ts"] --> A["Analyzer"]
+    CLI_node --> A[Analyzer]
     CL --> A
 ```
 
-**Rule 5 — Inner quotes must use HTML entities:**
+**Rule 5 — Inner quotes must use HTML entities (in unquoted labels):**
 
 ```mermaid
-%% WRONG — unescaped nested quotes
-A["Config "key" value"]
+%% WRONG — unescaped nested quotes inside label
+flowchart TD
+    A[Config "key" value]
 
-%% CORRECT — escaped with &quot;
-A["Config &quot;key&quot; value"]
+%% CORRECT — escaped inner quotes
+flowchart TD
+    A[Config &quot;key&quot; value]
 ```
 
 **Rule 6 — sequenceDiagram participants must be alphanumeric:**
@@ -188,13 +194,15 @@ participant User as U
 
 ```mermaid
 %% WRONG — "class" is a reserved word
-class["class"]
+flowchart TD
+    class[class]
 
 %% CORRECT — rename to avoid conflict
-NodeClass["class"]
+flowchart TD
+    NodeClass[class]
 ```
 
-**One-line principle**: IDs: English alphanumeric | Labels: always quoted | Special chars: HTML entities.
+**One-line principle**: IDs: English alphanumeric | Labels: unquoted | Special chars: HTML entities.
 
 > **Full reference**: [mermaid-syntax.md](./refs/mermaid-syntax.md) — comprehensive cheat sheet for edge cases
 

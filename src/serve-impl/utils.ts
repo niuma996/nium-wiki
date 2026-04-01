@@ -23,5 +23,5 @@ export function escapeHtml(s: string): string {
 }
 
 export function escapeJs(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+  return JSON.stringify(String(s)).slice(1, -1);
 }

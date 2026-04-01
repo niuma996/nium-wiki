@@ -237,6 +237,20 @@ ${VENDOR_HEAD}
           }
         }
       });
+      // SSE hot reload: listen for file changes and refresh the page
+      (function() {
+        var es = new EventSource('/_api/events');
+        es.onmessage = function(e) {
+          try {
+            var data = JSON.parse(e.data);
+            if (data.type === 'reload') {
+              // Soft refresh: reload the current page (preserves scroll position if docsify supports it)
+              location.reload();
+            }
+          } catch {}
+        };
+        es.onerror = function() { /* silently reconnect */ };
+      })();
     })();
   </script>
 ${VENDOR_SCRIPTS}

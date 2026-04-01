@@ -218,6 +218,45 @@ function generateIssues(
 /**
  * Extract all mermaid blocks from markdown content with their line numbers.
  */
+/**
+ * Collect all subgraph container IDs in a diagram.
+ */
+function collectSubgraphIds(lines: string[]): Set<string> {
+  const ids = new Set<string>();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('%%')) continue;
+    const m = trimmed.match(/^subgraph\s+([A-Za-z0-9_]+)\[/);
+    if (m) ids.add(m[1]);
+  }
+  return ids;
+}
+
+/**
+ * Check if a line (by index) is inside a subgraph whose container ID matches `id`.
+ * Uses indentation as a proxy: a line is inside a subgraph when a prior "subgraph ID[...]" line
+ * is at a lower indentation level and no "end" has closed it since.
+ */
+function isInsideSubgraph(lines: string[], lineIdx: number, id: string): boolean {
+  let depth = 0;
+  for (let i = 0; i <= lineIdx; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('%%')) continue;
+    if (/^subgraph\s+[A-Za-z0-9_]+\[/.test(trimmed)) {
+      depth++;
+    }
+    if (trimmed === 'end') {
+      depth = Math.max(0, depth - 1);
+    }
+    // Check if this subgraph's ID matches our id
+    const m = trimmed.match(/^subgraph\s+([A-Za-z0-9_]+)\[/);
+    if (m && m[1] === id && i < lineIdx && depth > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function extractMermaidBlocks(
   lines: string[],
 ): Array<{ line: number; body: string }> {
@@ -314,28 +353,7 @@ function validateMermaidDiagram(
     }
   }
 
-  // 4. Check for unquoted node labels with spaces (heuristic: ID[text with spaces not in quotes])
-  // Matches: A[Label With Spaces] or A(Label With Spaces) but NOT A["Label With Spaces"]
-  const unquotedLabel =
-    /^([A-Za-z0-9_]+)\[([^\["'\(][^\[]*)\]$/;
-  for (let i = 0; i < diagramLines.length; i++) {
-    const line = diagramLines[i].trim();
-    if (line.startsWith('%%')) continue;
-    const m = line.match(unquotedLabel);
-    if (m) {
-      const label = m[2];
-      if (label.includes(' ') || /[^\x00-\x7F]/.test(label)) {
-        issues.push({
-          severity: 'warn',
-          line: baseLine + i,
-          message: `Node ID "${m[1]}" has an unquoted label with spaces / non-ASCII: "${label}"`,
-          suggestion: `Quote the label: ${m[1]}["${label}"]`,
-        });
-      }
-    }
-  }
-
-  // 5. Check for non-ASCII characters in node IDs (alphanumeric-only rule)
+  // 4. Check for non-ASCII characters in node IDs
   const nodeIdNonAscii =
     /^([A-Za-z0-9_]+)\[/;
   for (let i = 0; i < diagramLines.length; i++) {
@@ -355,7 +373,7 @@ function validateMermaidDiagram(
     }
   }
 
-  // 6. Reserved keywords as bare IDs
+  // 5. Reserved keywords as bare IDs
   const reserved = [
     'class',
     'graph',
@@ -384,20 +402,37 @@ function validateMermaidDiagram(
     }
   }
 
-  // 7. Inside a subgraph, ID["text"] reuses the subgraph/container ID — causes ID collision
-  // e.g. "subgraph CLI[...]" then "CLI["cli.ts"]" inside — CLI is already the container ID
-  const invalidSubgraphNode = /^\s*([A-Za-z0-9_]+)\["[^"]+"\]\s*$/;
+  // 6. ID["text"] is never valid as a label in Mermaid (quotes only work for tooltips)
+  //    Mermaid supports:  A[plain]   A["tooltip"]   A["tooltip","label"]
+  //    Mermaid does NOT support: A["Label Text"]
+  const invalidQuotedLabel = /^\s*([A-Za-z0-9_]+)\["[^"]+"\]\s*$/;
   for (let i = 0; i < diagramLines.length; i++) {
     const line = diagramLines[i].trim();
     if (line.startsWith('%%')) continue;
-    const m = line.match(invalidSubgraphNode);
+    const m = line.match(invalidQuotedLabel);
     if (m) {
-      issues.push({
-        severity: 'error',
-        line: baseLine + i,
-        message: `Node "${m[1]}["..."]" uses ID["text"] format — the ID may conflict with a subgraph/container ID and cause render errors`,
-        suggestion: `Define the node without brackets inside a subgraph (e.g. "${m[1]}"), or use ID[label] (no quotes) if a label is needed`,
-      });
+      const nodeId = m[1];
+      const label = m[2] ?? line.match(/"([^"]+)"/)?.[1] ?? '';
+      // Determine if inside a subgraph with a matching container ID
+      const subgraphIds = collectSubgraphIds(diagramLines);
+      const inMatchingSubgraph = isInsideSubgraph(diagramLines, i, nodeId);
+      const isSubgraphCollision = inMatchingSubgraph && subgraphIds.has(nodeId);
+
+      if (isSubgraphCollision) {
+        issues.push({
+          severity: 'error',
+          line: baseLine + i,
+          message: `Node "${nodeId}["${label}"]" — the quoted format is invalid as a label AND "${nodeId}" is already the container ID of its parent subgraph`,
+          suggestion: `Use "${nodeId}_node[${label}]" instead (rename to avoid ID collision, remove quotes for the label)`,
+        });
+      } else {
+        issues.push({
+          severity: 'error',
+          line: baseLine + i,
+          message: `Node "${nodeId}["${label}"]" uses quoted label format — Mermaid does not support quoted labels (quotes are only valid for tooltips)`,
+          suggestion: `Use "${nodeId}[${label}]" (remove quotes for plain labels) or "${nodeId}["${label}","${label}"]" (if you need a tooltip)`,
+        });
+      }
     }
   }
 

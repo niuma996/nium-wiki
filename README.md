@@ -46,7 +46,7 @@ For incremental updates after code changes:
 > update wiki
 ```
 
-Changed files are detected via SHA256 hashing, and only affected documents are regenerated.
+Changed files are detected via SHA256 hashing. The `incremental` command combines diff analysis, dependency graph traversal, and doc-to-doc propagation to pinpoint affected wiki pages — regenerating only what changed, nothing more.
 
 ### Generated Output Structure
 
@@ -97,6 +97,10 @@ npx nium-wiki serve .nium-wiki/wiki
 ```
 
 Open `http://localhost:4000` in your browser to preview the generated docs, with full-text search, sidebar navigation, and Mermaid diagram rendering.
+
+### Wiki Generation Showcase
+
+See [claude-code-sourcemap-wiki](https://github.com/niuma996/claude-code-sourcemap-wiki) for a live example of a full project generated with Nium-Wiki.
 
 ### Configuration
 

@@ -37,7 +37,7 @@ export function prepareDocsify(
 
   // 为每个可用语言目录生成 docsify 文件 / Generate docsify files for each available language directory
   for (const a of available) {
-    fs.writeFileSync(path.join(a.dir, 'index.html'), generateDocsifyIndex(name, languages), 'utf-8');
+    fs.writeFileSync(path.join(a.dir, 'index.html'), generateDocsifyIndex(name, languages, a.lang), 'utf-8');
     fs.writeFileSync(path.join(a.dir, '_sidebar.md'), generateSidebarMd(a.dir, a.lang), 'utf-8');
     const nojekyllPath = path.join(a.dir, '.nojekyll');
     if (!fs.existsSync(nojekyllPath)) {

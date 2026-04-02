@@ -6,8 +6,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const DIST_VENDOR = path.join(__dirname, '..', 'dist', 'vendor');
+const DIST_SERVE_IMPL = path.join(__dirname, '..', 'dist', 'serve-impl');
 
 // 源文件映射: dist/vendor/ 下的目标路径 → node_modules 中的源路径
 const VENDOR_FILES = {
@@ -64,6 +66,22 @@ for (const [dest, src] of Object.entries(VENDOR_FILES)) {
 }
 
 const totalSize = getTotalSize(DIST_VENDOR);
+
+// Copy compiled app.js from dist/serve-impl/ to dist/vendor/ with content-hash filename
+const appSrc = path.join(DIST_SERVE_IMPL, 'app.js');
+if (fs.existsSync(appSrc)) {
+  const content = fs.readFileSync(appSrc);
+  const hash = crypto.createHash('md5').update(content).digest('hex').slice(0, 8);
+  const appDest = path.join(DIST_VENDOR, `app.${hash}.js`);
+  fs.copyFileSync(appSrc, appDest);
+  // Write hash so templates.ts can reference the same filename
+  fs.writeFileSync(path.join(DIST_SERVE_IMPL, 'app-hash.txt'), hash, 'utf-8');
+  copied++;
+} else {
+  console.error(`  MISS  dist/serve-impl/app.js (run build first)`);
+  failed++;
+}
+
 console.log(`vendor: ${copied} files copied (${formatSize(totalSize)}), ${failed} missing`);
 
 if (failed > 0) {

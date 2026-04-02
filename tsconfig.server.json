@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "declaration": false
+    "declaration": false,
+    "lib": ["ES2020", "DOM"]
   },
-  "include": ["src/serve.ts"]
+  "include": ["src/serve.ts", "src/serve-impl/app.ts"]
 }

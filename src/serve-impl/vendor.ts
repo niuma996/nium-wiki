@@ -33,7 +33,7 @@ export const VENDOR_SCRIPTS = `  <!-- docsify core -->
   <!-- mermaid -->
   <script src="/_vendor/mermaid/mermaid.min.js"></script>
   <script src="/_vendor/docsify-mermaid/docsify-mermaid.js"></script>
-  <script>mermaid.initialize({ startOnLoad: false, theme: 'default' });</script>`;
+  <script>mermaid.initialize({ startOnLoad: false, theme: 'neutral' });</script>`;
 
 /**
  * Handle /_vendor/* requests, serve static files from dist/vendor/

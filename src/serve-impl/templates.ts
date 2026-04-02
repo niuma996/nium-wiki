@@ -25,23 +25,23 @@ const LANG_LABELS: Record<string, string> = {
   ru: 'Русский',
 };
 
-const SEARCH_LABELS: Record<string, { placeholder: string; noData: string }> = {
-  zh: { placeholder: '搜索文档...', noData: '没有找到结果' },
-  en: { placeholder: 'Search docs...', noData: 'No results found' },
-  ja: { placeholder: 'ドキュメントを検索...', noData: '結果が見つかりません' },
-  ko: { placeholder: '문서 검색...', noData: '결과 없음' },
-  fr: { placeholder: 'Rechercher...', noData: 'Aucun résultat' },
-  de: { placeholder: 'Dokumente suchen...', noData: 'Keine Ergebnisse' },
-  es: { placeholder: 'Buscar documentos...', noData: 'Sin resultados' },
-  pt: { placeholder: 'Pesquisar documentos...', noData: 'Nenhum resultado' },
-  ru: { placeholder: 'Поиск документов...', noData: 'Ничего не найдено' },
+const SEARCH_LABELS: Record<string, { placeholder: string; noData: string; hint: string; indexing: string; loading: string; scrollTop: string; close: string }> = {
+  zh: { placeholder: '搜索文档...', noData: '没有找到结果', hint: '按 Esc 关闭 · 点击结果跳转', indexing: '正在检索文档...', loading: '加载中...', scrollTop: '回到顶部', close: '关闭' },
+  en: { placeholder: 'Search docs...', noData: 'No results found', hint: 'Esc to close · Click result to navigate', indexing: 'Indexing docs...', loading: 'Loading...', scrollTop: 'Back to top', close: 'Close' },
+  ja: { placeholder: 'ドキュメントを検索...', noData: '結果が見つかりません', hint: 'Escで閉じる · 結果をクリックして移動', indexing: 'ドキュメントをインデックス中...', loading: '読み込み中...', scrollTop: 'トップへ戻る', close: '閉じる' },
+  ko: { placeholder: '문서 검색...', noData: '결과 없음', hint: 'Esc 닫기 · 결과 클릭하여 이동', indexing: '문서 인덱싱 중...', loading: '로딩 중...', scrollTop: '맨 위로', close: '닫기' },
+  fr: { placeholder: 'Rechercher...', noData: 'Aucun résultat', hint: 'Esc fermer · Cliquer pour naviguer', indexing: 'Indexation...', loading: 'Chargement...', scrollTop: 'Haut de page', close: 'Fermer' },
+  de: { placeholder: 'Dokumente suchen...', noData: 'Keine Ergebnisse', hint: 'Esc schließen · Klick zum Navigieren', indexing: 'Indizierung...', loading: 'Laden...', scrollTop: 'Nach oben', close: 'Schließen' },
+  es: { placeholder: 'Buscar documentos...', noData: 'Sin resultados', hint: 'Esc cerrar · Clic para navegar', indexing: 'Indexando...', loading: 'Cargando...', scrollTop: 'Subir', close: 'Cerrar' },
+  pt: { placeholder: 'Pesquisar documentos...', noData: 'Nenhum resultado', hint: 'Esc fechar · Clique para navegar', indexing: 'Indexando...', loading: 'A carregar...', scrollTop: 'Subir', close: 'Fechar' },
+  ru: { placeholder: 'Поиск документов...', noData: 'Ничего не найдено', hint: 'Esc закрыть · Клик для перехода', indexing: 'Индексация...', loading: 'Загрузка...', scrollTop: 'Вверх', close: 'Закрыть' },
 };
 
 export function getLangLabel(lang: string): string {
   return LANG_LABELS[lang] || lang;
 }
 
-function getSearchLabels(lang: string): { placeholder: string; noData: string } {
+function getSearchLabels(lang: string) {
   return SEARCH_LABELS[lang] ?? SEARCH_LABELS['en'];
 }
 
@@ -103,6 +103,14 @@ export function generateDocsifyIndex(projectName: string, languages?: LangOption
   var m=document.cookie.match(/nw_lang=([a-z]{2})/);
   if(m){var s=document.getElementById('lang-switcher');if(s)s.value=m[1];}
 })();` : '';
+
+  // i18n strings for the search modal, passed as data attributes for JS to read
+  const searchI18n = JSON.stringify({
+    noData: search.noData,
+    hint: search.hint,
+    indexing: search.indexing,
+    close: search.close,
+  });
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -235,12 +243,49 @@ ${VENDOR_HEAD}
     .copy-btn.copied { color: var(--nw-copied); border-color: var(--nw-copied); }
     #scroll-top { display: none; position: fixed; bottom: 24px; right: 24px; z-index: 200; width: 36px; height: 36px; font-size: 18px; line-height: 36px; text-align: center; color: var(--nw-btn-color); background: var(--nw-btn-bg); border: 1px solid var(--nw-btn-border); border-radius: 50%; cursor: pointer; transition: opacity 0.2s, background 0.15s; }
     #scroll-top:hover { background: var(--nw-btn-hover-bg); color: var(--nw-btn-hover-color); }
+    /* Search modal */
+    #search-modal { display: none; position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); align-items: flex-start; justify-content: center; padding-top: 80px; }
+    #search-modal.open { display: flex; }
+    #search-modal-box { background: #fff; border-radius: 10px; width: 600px; max-width: 90vw; max-height: 70vh; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.25); display: flex; flex-direction: column; }
+    #search-modal-input-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #eee; gap: 8px; }
+    #search-modal-input-row svg { color: #888; flex-shrink: 0; }
+    #search-modal-input { flex: 1; border: none; outline: none; font-size: 15px; font-family: inherit; background: transparent; }
+    #search-modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; padding: 0; line-height: 1; }
+    #search-modal-close:hover { color: #555; }
+    #search-modal-results { overflow-y: auto; flex: 1; }
+    #search-modal-results:empty { display: none; }
+    .search-result-item { display: block; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; text-decoration: none; color: inherit; transition: background 0.1s; }
+    .search-result-item:hover { background: #f9f9f9; }
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-title { font-size: 14px; font-weight: 500; color: #333; margin-bottom: 2px; }
+    .search-result-excerpt { font-size: 12px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .search-result-excerpt mark { background: #fff9c4; color: inherit; }
+    #search-modal-empty { display: none; padding: 24px 16px; text-align: center; color: #aaa; font-size: 14px; }
+    #search-modal-hint { display: none; padding: 8px 16px; font-size: 11px; color: #bbb; text-align: center; border-top: 1px solid #f0f0f0; }
+    /* Hide docsify default search results */
+    .search-results { display: none !important; }
     ${langSwitcherStyle}
   </style>
 </head>
 <body>${langSwitcherHtml}
-  <div id="app">加载中...</div>
-  <button id="scroll-top" title="回到顶部">&#8679;</button>
+  <div id="app">${escapeHtml(search.loading)}</div>
+  <button id="scroll-top" title="${escapeHtml(search.scrollTop)}">&#8679;</button>
+  <!-- Search modal -->
+  <div id="search-modal" role="dialog" aria-label="Search"
+       data-i18n='${escapeHtml(searchI18n)}'>
+    <div id="search-modal-box">
+      <div id="search-modal-input-row">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607z"/>
+        </svg>
+        <input id="search-modal-input" type="text" placeholder="${escapeJs(search.placeholder)}" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button id="search-modal-close" aria-label="${escapeHtml(search.close)}">&#10005;</button>
+      </div>
+      <div id="search-modal-results"></div>
+      <div id="search-modal-empty"></div>
+      <div id="search-modal-hint"></div>
+    </div>
+  </div>
   <script>
     window.$docsify = {
       name: '${escapeJs(projectName)}',
@@ -250,7 +295,8 @@ ${VENDOR_HEAD}
       search: {
         placeholder: '${escapeJs(search.placeholder)}',
         noData: '${escapeJs(search.noData)}',
-        depth: 6
+        depth: 6,
+        searchIndex: '/search_index.json'
       },
       auto2top: true,
       mergeNavbar: true,
@@ -280,4 +326,3 @@ ${VENDOR_SCRIPTS}
 </html>
 `;
 }
-

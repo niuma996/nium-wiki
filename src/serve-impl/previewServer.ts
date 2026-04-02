@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
+import { execSync } from 'child_process';
 
 import { MIME_TYPES } from './utils';
 import { handleVendorRequest } from './vendor';
@@ -42,6 +43,15 @@ export function prepareDocsify(
     const nojekyllPath = path.join(a.dir, '.nojekyll');
     if (!fs.existsSync(nojekyllPath)) {
       fs.writeFileSync(nojekyllPath, '', 'utf-8');
+    }
+    // 生成搜索索引 / Build search index
+    try {
+      execSync(`node "${path.resolve(__dirname, '..', '..', 'scripts', 'build-search-index.js')}" "${a.dir}"`, {
+        stdio: 'pipe',
+        timeout: 30000,
+      });
+    } catch (e) {
+      // non-fatal: search will fall back to dynamic crawling
     }
   }
 

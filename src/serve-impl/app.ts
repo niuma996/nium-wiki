@@ -10,6 +10,246 @@
 (function () {
   'use strict';
 
+  // ── Search modal ────────────────────────────────────────────────────
+
+  var searchModal, searchInput, searchResults, searchEmpty, searchHint;
+  var searchIndex = null;
+  var searchDebounceTimer = null;
+  var searchI18n = { noData: 'No results found', hint: 'Esc to close · Click result to navigate', indexing: 'Indexing docs...', close: 'Close' };
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function highlight(text, term) {
+    if (!term) return escapeHtml(text);
+    var regex = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escapeHtml(text).replace(regex, '<mark>$1</mark>');
+  }
+
+  function openSearchModal() {
+    if (!searchModal) {
+      searchModal = document.getElementById('search-modal');
+      searchInput = document.getElementById('search-modal-input');
+      searchResults = document.getElementById('search-modal-results');
+      searchEmpty = document.getElementById('search-modal-empty');
+      searchHint = document.getElementById('search-modal-hint');
+      // Read i18n from data attribute
+      try {
+        var raw = searchModal.getAttribute('data-i18n');
+        if (raw) searchI18n = JSON.parse(raw);
+      } catch (_) { /* use defaults */ }
+      var closeBtn = searchModal.querySelector('#search-modal-close');
+      if (closeBtn) closeBtn.setAttribute('aria-label', searchI18n.close || 'Close');
+      searchModal.querySelector('#search-modal-close').addEventListener('click', closeSearchModal);
+      searchModal.addEventListener('click', function(e) {
+        if (e.target === searchModal) closeSearchModal();
+      });
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(runSearch, 150);
+      });
+      searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeSearchModal();
+      });
+    }
+    searchModal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    searchInput.value = '';
+    searchResults.innerHTML = '';
+    searchEmpty.style.display = 'none';
+    searchEmpty.textContent = '';
+    searchHint.style.display = 'block';
+    searchHint.textContent = searchI18n.hint;
+    searchInput.focus();
+    // Pre-fill from docsify search input if present
+    var docsifyInput = document.querySelector('.search input[type=text], .search input[type=search]');
+    if (docsifyInput && docsifyInput.value) {
+      searchInput.value = docsifyInput.value;
+      runSearch();
+    }
+  }
+
+  function closeSearchModal() {
+    if (!searchModal) return;
+    searchModal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function runSearch() {
+    var term = searchInput.value.trim();
+    if (!term) { searchResults.innerHTML = ''; searchEmpty.style.display = 'none'; return; }
+    if (!searchIndex) {
+      searchResults.innerHTML = '';
+      searchEmpty.style.display = 'block';
+      searchEmpty.textContent = searchI18n.indexing;
+      fetchSearchIndex(function(idx) {
+        searchIndex = idx;
+        renderResults(term);
+      });
+    } else {
+      renderResults(term);
+    }
+  }
+
+  function fetchSearchIndex(callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/search_index.json', true);
+    xhr.onload = function() {
+      if (xhr.status === 200 && xhr.responseText.trim().startsWith('{')) {
+        try { callback(JSON.parse(xhr.responseText)); } catch (_) { buildIndexFromFetch(callback); }
+      } else {
+        buildIndexFromFetch(callback);
+      }
+    };
+    xhr.onerror = function() { buildIndexFromFetch(callback); };
+    xhr.send();
+  }
+
+  // Fallback: build a mini search index by fetching all markdown links from sidebar
+  function buildIndexFromFetch(callback) {
+    var result = {};
+    var pending = 0;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/_sidebar.md', true);
+    xhr.onload = function() {
+      if (xhr.status !== 200) { callback({}); return; }
+      var links = [];
+      var temp = document.createElement('div');
+      temp.innerHTML = xhr.responseText;
+      temp.querySelectorAll('a[href]').forEach(function(a) {
+        var href = a.getAttribute('href');
+        if (href && href.endsWith('.md') && !href.startsWith('http') && !href.startsWith('//')) {
+          links.push(href);
+        }
+      });
+      if (links.length === 0) { callback({}); return; }
+      pending = links.length;
+      links.forEach(function(link) {
+        var fx = new XMLHttpRequest();
+        fx.open('GET', link, true);
+        fx.onload = function() {
+          if (fx.status === 200) {
+            var text = fx.responseText;
+            var titleMatch = text.match(/^#\s+(.+)/m);
+            var title = titleMatch ? titleMatch[1].trim() : link.replace('.md', '').replace(/.*\//, '');
+            result[link] = { title: title, url: link.replace(/\.md$/, '.html'), body: text.replace(/^#.+$/gm, '').replace(/```[\s\S]*?```/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').substring(0, 2000) };
+          }
+          pending--;
+          if (pending <= 0) callback(result);
+        };
+        fx.onerror = function() { pending--; if (pending <= 0) callback(result); };
+        fx.send();
+      });
+    };
+    xhr.onerror = function() { callback({}); };
+    xhr.send();
+  }
+
+  function renderResults(term) {
+    var termLower = term.toLowerCase();
+    var maxDepth = 6;
+    var results = [];
+
+    function walk(data, depth) {
+      if (depth > maxDepth || !data || typeof data !== 'object') return;
+      for (var key in data) {
+        var val = data[key];
+        if (val && typeof val === 'object') {
+          // docsify search index: each entry has title + url + body
+          if (val.title && val.url) {
+            var body = val.body || '';
+            var titleMatch = val.title.toLowerCase().includes(termLower);
+            var bodyMatch = String(body).toLowerCase().includes(termLower);
+            if (titleMatch || bodyMatch) {
+              results.push({
+                url: val.url,
+                title: val.title,
+                body: typeof body === 'string' ? body : '',
+                titleMatch: titleMatch
+              });
+            }
+          } else {
+            walk(val, depth + 1);
+          }
+        }
+      }
+    }
+
+    walk(searchIndex, 0);
+
+    // Sort: title matches first
+    results.sort(function(a, b) {
+      var aTitle = a.title.toLowerCase().includes(termLower) ? 0 : 1;
+      var bTitle = b.title.toLowerCase().includes(termLower) ? 0 : 1;
+      return aTitle - bTitle;
+    });
+
+    searchResults.innerHTML = '';
+    if (results.length === 0) {
+      searchEmpty.textContent = searchI18n.noData;
+      searchEmpty.style.display = 'block';
+      return;
+    }
+    searchEmpty.style.display = 'none';
+
+    var maxResults = 20;
+    results.slice(0, maxResults).forEach(function(r) {
+      var excerpt = '';
+      var bodyLower = r.body.toLowerCase();
+      var idx = bodyLower.indexOf(termLower);
+      if (idx >= 0) {
+        var start = Math.max(0, idx - 40);
+        var end = Math.min(r.body.length, idx + term.length + 60);
+        excerpt = (start > 0 ? '...' : '') + r.body.substring(start, end) + (end < r.body.length ? '...' : '');
+      }
+      var a = document.createElement('a');
+      a.className = 'search-result-item';
+      var rawUrl = r.url;
+      // Normalize to docsify hash routing: /path.html -> /#/path
+      var normalizedUrl = rawUrl.replace(/\.html$/, '').replace(/^\/(?!\/)/, '/#');
+      a.href = normalizedUrl;
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        closeSearchModal();
+        if (window.$docsify && window.$docsify.router && window.$docsify.router.resolve) {
+          window.$docsify.router.resolve(rawUrl, true, true);
+        } else {
+          location.href = normalizedUrl;
+        }
+      });
+      a.innerHTML =
+        '<div class="search-result-title">' + highlight(r.title, term) + '</div>' +
+        (excerpt ? '<div class="search-result-excerpt">' + highlight(excerpt, term) + '</div>' : '');
+      searchResults.appendChild(a);
+    });
+  }
+
+  // Intercept clicks on docsify's search input to open our modal
+  // Use capture phase + mousedown to intercept before docsify stops propagation
+  document.addEventListener('mousedown', function(e) {
+    var searchEl = e.target.closest ? e.target.closest('.search') : null;
+    if (!searchEl) return;
+    var input = searchEl.querySelector('input');
+    if (!input) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openSearchModal();
+  }, true);
+
+  // / key opens search modal (like GitHub/VuePress)
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== '/') return;
+    var tag = (e.target as Element).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as Element).isContentEditable) return;
+    e.preventDefault();
+    openSearchModal();
+  });
+
   // ── Mermaid fullscreen modal ─────────────────────────────────────────
 
   function getMermaidModal() {
@@ -164,7 +404,7 @@
   // ── Keyboard: Escape closes modal ───────────────────────────────────
 
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeMermaidModal();
+    if (e.key === 'Escape') { closeMermaidModal(); closeSearchModal(); }
   });
 
   // ── SSE hot reload ────────────────────────────────────────────────

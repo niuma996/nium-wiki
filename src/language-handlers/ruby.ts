@@ -2,7 +2,7 @@
  * Ruby 语言处理模块
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { BaseLanguageHandler, VersionInfo, ProjectTypeDetection, ComplexityConfig, ImportResolveConfig } from './base';
 
@@ -93,6 +93,20 @@ export class RubyHandler extends BaseLanguageHandler {
     }
 
     return versions;
+  }
+
+  async detectProjectVersion(projectRoot: string): Promise<string | null> {
+    try {
+      const files = readdirSync(projectRoot);
+      for (const file of files) {
+        if (file.endsWith('.gemspec')) {
+          const content = readFileSync(resolve(projectRoot, file), 'utf-8');
+          const m = content.match(/spec\.version\s*=\s*["']([^"']+)["']/);
+          if (m) return m[1];
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
   }
 
   async findEntryPoints(files: string[], projectRoot: string): Promise<string[]> {

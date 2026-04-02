@@ -1,6 +1,6 @@
 {
   "name": "nium-wiki",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Professional-grade structured project Wiki generator, powered by AI coding tools",
   "main": "dist/serve.js",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.server.json && node scripts/copy-vendor.js",
-    "bundle": "ncc build src/cli.ts -o skills/nium-wiki/scripts --minify && node scripts/post-bundle.js",
+    "bundle": "ncc build src/cli.ts -o skills/nium-wiki/scripts --minify && node scripts/inject-version.js && node scripts/post-bundle.js",
     "start": "node dist/serve.js",
     "dev": "ts-node src/cli.ts"
   },

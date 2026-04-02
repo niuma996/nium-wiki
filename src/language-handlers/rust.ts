@@ -78,6 +78,20 @@ export class RustHandler extends BaseLanguageHandler {
     return versions;
   }
 
+  async detectProjectVersion(projectRoot: string): Promise<string | null> {
+    const cargoPath = resolve(projectRoot, 'Cargo.toml');
+    if (!existsSync(cargoPath)) return null;
+    try {
+      const content = readFileSync(cargoPath, 'utf-8');
+      // [package] / [lib] version = "1.2.3"
+      const m = content.match(/^\[package\]\s*\n[^]*?version\s*=\s*"([^"]+)"/m)
+        || content.match(/version\s*=\s*"([^"]+)"/);
+      return m ? m[1] : null;
+    } catch {
+      return null;
+    }
+  }
+
   async findEntryPoints(files: string[], projectRoot: string): Promise<string[]> {
     return this.findEntryPointsByConfig(files, projectRoot, {
       commonEntries: [

@@ -9,7 +9,7 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { updateSourceIndex, diffSourceIndex } from '../core/sourceIndex';
 import { CONFIG_EXCLUDE_LIST } from '../utils/patterns';
-import { getVersion } from '../utils/version';
+import { languageHandlerManager } from '../language-handlers/index';
 
 interface NiumWikiConfig {
   language: string;
@@ -45,16 +45,16 @@ function getGitBranch(cwd: string): string {
   }
 }
 
-function getDefaultMeta(projectRoot: string): Record<string, unknown> {
+async function getDefaultMeta(projectRoot: string): Promise<Record<string, unknown>> {
   const now = new Date().toISOString();
+  const languageIds = languageHandlerManager.detectProjectLanguages(projectRoot);
+  const projectVersion = await languageHandlerManager.detectProjectVersionForLanguages(languageIds, projectRoot);
   return {
-    version: getVersion(),
     project: path.basename(projectRoot),
     branch: getGitBranch(projectRoot),
     createdAt: now,
     updatedAt: now,
-    filesDocumented: 0,
-    modulesCount: 0,
+    ...(projectVersion ? { version: projectVersion } : {}),
   };
 }
 
@@ -65,7 +65,7 @@ export interface InitResult {
   message: string;
 }
 
-export function initNiumWiki(projectRoot: string, force = false, primaryLang?: string): InitResult {
+export async function initNiumWiki(projectRoot: string, force = false, primaryLang?: string): Promise<InitResult> {
   const wikiDir = path.join(projectRoot, '.nium-wiki');
 
   const result: InitResult = {
@@ -134,7 +134,7 @@ export function initNiumWiki(projectRoot: string, force = false, primaryLang?: s
   // 创建元数据文件 / Create metadata file
   const metaPath = path.join(wikiDir, 'meta.json');
   if (!fs.existsSync(metaPath) || force) {
-    fs.writeFileSync(metaPath, JSON.stringify(getDefaultMeta(projectRoot), null, 2), 'utf-8');
+    fs.writeFileSync(metaPath, JSON.stringify(await getDefaultMeta(projectRoot), null, 2), 'utf-8');
     result.created.push('meta.json');
   }
 

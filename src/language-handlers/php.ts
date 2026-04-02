@@ -90,6 +90,17 @@ export class PhpHandler extends BaseLanguageHandler {
     return versions;
   }
 
+  async detectProjectVersion(projectRoot: string): Promise<string | null> {
+    const composerPath = resolve(projectRoot, 'composer.json');
+    if (!existsSync(composerPath)) return null;
+    try {
+      const pkg = JSON.parse(readFileSync(composerPath, 'utf-8'));
+      return pkg.version ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async findEntryPoints(files: string[], projectRoot: string): Promise<string[]> {
     return this.findEntryPointsByConfig(files, projectRoot, {
       commonEntries: [

@@ -171,6 +171,31 @@ export class PythonHandler extends BaseLanguageHandler {
     return versions;
   }
 
+  async detectProjectVersion(projectRoot: string): Promise<string | null> {
+    const pyprojectPath = resolve(projectRoot, 'pyproject.toml');
+    if (existsSync(pyprojectPath)) {
+      try {
+        const content = readFileSync(pyprojectPath, 'utf-8');
+        // [project] version = "1.2.3"
+        let m = content.match(/^\[project\]\s*\n[^]*?version\s*=\s*["']([^"']+)["']/m);
+        if (m) return m[1];
+        // [tool.poetry] version = "1.2.3"
+        m = content.match(/^\[tool\.poetry\]\s*\n[^]*?version\s*=\s*["']([^"']+)["']/m);
+        if (m) return m[1];
+      } catch { /* ignore */ }
+    }
+    // setup.py: version = "1.2.3"
+    const setupPyPath = resolve(projectRoot, 'setup.py');
+    if (existsSync(setupPyPath)) {
+      try {
+        const content = readFileSync(setupPyPath, 'utf-8');
+        const m = content.match(/version\s*=\s*["']([^"']+)["']/);
+        if (m) return m[1];
+      } catch { /* ignore */ }
+    }
+    return null;
+  }
+
   /**
    * 查找入口文件
    */

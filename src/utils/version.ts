@@ -17,12 +17,19 @@ export function getVersion(): string {
     return cachedVersion;
   }
 
-  // Try multiple paths to support both normal and bundled (ncc) execution
-  // 尝试多个路径，同时支持普通执行和 ncc bundle 执行
+  // 1. NIUM_WIKI_VERSION injected at bundle time via --define (always wins if set)
+  //    打包时通过 --define 注入（优先使用）
+  const envVersion = (process.env.NIUM_WIKI_VERSION as string | undefined);
+  if (envVersion) {
+    cachedVersion = envVersion;
+    return cachedVersion;
+  }
+
+  // 2. Fallback: resolve from bundled file's location
+  //    回退：从打包文件所在目录向上查找
   const candidates = [
     path.resolve(__dirname, '../../package.json'),  // normal: dist/utils/ -> root
     path.resolve(__dirname, '../package.json'),      // bundled: bin/ -> root
-    path.resolve(process.cwd(), 'package.json'),     // fallback: cwd
   ];
 
   for (const pkgPath of candidates) {

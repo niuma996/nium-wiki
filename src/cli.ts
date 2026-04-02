@@ -54,7 +54,7 @@ program
   .argument('[project-path]', 'Project root directory', process.cwd())
   .option('-f, --force', 'Force reinitialization', false)
   .option('-l, --lang <code>', 'Primary language code (zh/en/ja/ko/fr/de), defaults to system language')
-  .action((projectPath: string, opts: { force: boolean; lang?: string }) => {
+  .action(async (projectPath: string, opts: { force: boolean; lang?: string }) => {
     const resolved = path.resolve(projectPath);
     let primaryLang = opts.lang || getOsLang();
     // Re-init: preserve existing language from config.json instead of overwriting with system lang
@@ -65,7 +65,7 @@ program
         primaryLang = existing.primaryLang;
       }
     }
-    const result = initNiumWiki(resolved, opts.force, primaryLang);
+    const result = await initNiumWiki(resolved, opts.force, primaryLang);
     printInitResult(result);
     process.exitCode = result.success ? 0 : 1;
   });

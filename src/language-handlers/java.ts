@@ -141,6 +141,18 @@ export class JavaHandler extends BaseLanguageHandler {
     return versions;
   }
 
+  async detectProjectVersion(projectRoot: string): Promise<string | null> {
+    const pomPath = resolve(projectRoot, 'pom.xml');
+    if (!existsSync(pomPath)) return null;
+    try {
+      const content = readFileSync(pomPath, 'utf-8');
+      const m = content.match(/<project[^>]*>[\s\S]*?<version>([^<]+)<\/version>/);
+      return m ? m[1] : null;
+    } catch {
+      return null;
+    }
+  }
+
   async findEntryPoints(files: string[], projectRoot: string): Promise<string[]> {
     return this.findEntryPointsByConfig(files, projectRoot, {
       commonEntries: [

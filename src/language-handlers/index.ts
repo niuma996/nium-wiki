@@ -376,6 +376,24 @@ export class LanguageHandlerManager {
   }
 
   /**
+   * 检测项目版本号（取第一个匹配到的语言handler的结果）
+   * @param languageIds List of language IDs / 语言ID列表
+   * @param projectRoot Project root directory / 项目根目录
+   */
+  public async detectProjectVersionForLanguages(
+    languageIds: string[],
+    projectRoot: string
+  ): Promise<string | null> {
+    for (const languageId of languageIds) {
+      const handler = this.getHandler(languageId);
+      if (!handler) continue;
+      const version = await handler.detectProjectVersion(projectRoot);
+      if (version) return version;
+    }
+    return null;
+  }
+
+  /**
    * Find entry files for multiple languages
    * 查找多种语言的入口文件
    * @param languageIds List of language IDs / 语言ID列表

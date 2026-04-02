@@ -158,6 +158,17 @@ export class JavaScriptHandler extends BaseLanguageHandler {
     return versions;
   }
 
+  async detectProjectVersion(projectRoot: string): Promise<string | null> {
+    const packageJsonPath = resolve(projectRoot, 'package.json');
+    if (!existsSync(packageJsonPath)) return null;
+    try {
+      const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+      return pkg.version ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * 查找入口文件
    */

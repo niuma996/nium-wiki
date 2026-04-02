@@ -138,6 +138,12 @@ export interface LanguageHandler {
   detectVersions(projectRoot: string): Promise<VersionInfo>;
 
   /**
+   * 检测项目版本号
+   * @param projectRoot 项目根目录
+   */
+  detectProjectVersion(projectRoot: string): Promise<string | null>;
+
+  /**
    * 检测代码规范
    * @param projectRoot 项目根目录
    */
@@ -371,6 +377,13 @@ export abstract class BaseLanguageHandler implements LanguageHandler {
    */
   async detectVersions(projectRoot: string): Promise<VersionInfo> {
     return {};
+  }
+
+  /**
+   * 检测项目版本号（默认实现，子类可覆盖）
+   */
+  async detectProjectVersion(_projectRoot: string): Promise<string | null> {
+    return null;
   }
 
   /**

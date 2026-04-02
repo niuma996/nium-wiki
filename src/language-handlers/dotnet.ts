@@ -2,7 +2,7 @@
  * .NET 语言处理模块
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { BaseLanguageHandler, VersionInfo, ProjectTypeDetection, ComplexityConfig, ImportResolveConfig } from './base';
 
@@ -59,7 +59,7 @@ export class DotNetHandler extends BaseLanguageHandler {
 
     for (const pattern of projectFiles) {
       try {
-        const files = require('fs').readdirSync(projectRoot);
+        const files = readdirSync(projectRoot);
         const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
         const matchingFiles = files.filter((f: string) => regex.test(f));
 
@@ -122,7 +122,7 @@ export class DotNetHandler extends BaseLanguageHandler {
     const projectFiles = ['*.csproj', '*.fsproj', '*.vbproj'];
     for (const pattern of projectFiles) {
       try {
-        const files = require('fs').readdirSync(projectRoot);
+        const files = readdirSync(projectRoot);
         const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
         const matchingFiles = files.filter((f: string) => regex.test(f));
 
@@ -153,6 +153,22 @@ export class DotNetHandler extends BaseLanguageHandler {
     }
 
     return versions;
+  }
+
+  async detectProjectVersion(projectRoot: string): Promise<string | null> {
+    const projectFiles = ['.csproj', '.fsproj', '.vbproj'];
+    try {
+      const files = readdirSync(projectRoot);
+      for (const file of files) {
+        if (projectFiles.some(ext => file.endsWith(ext))) {
+          const content = readFileSync(resolve(projectRoot, file), 'utf-8');
+          const m = content.match(/<Version>\s*([^<]+)\s*<\/Version>/)
+            || content.match(/<PackageVersion>\s*([^<]+)\s*<\/PackageVersion>/);
+          if (m) return m[1];
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
   }
 
   async findEntryPoints(files: string[], projectRoot: string): Promise<string[]> {

@@ -23,16 +23,6 @@
 
 ## System Architecture Diagram / 系统架构图
 
-<!--
-  MANDATORY: Pre-generation checklist — apply before writing any Mermaid diagram.
-  ☑ Every node line ends with `"]` (count opening `"` vs closing `"]`)
-  ☑ No subgraph ID duplicates any node ID in the same diagram
-  ☑ No subgraph ID is a Mermaid reserved word (class, graph, node, subgraph, style, click)
-  ☑ Each edge connects either node→node or subgraph→subgraph — never mixed
-  ☑ Each subgraph contains ≤ 5 nodes
-  ☑ Node IDs are alphanumeric only (no dots, slashes, Chinese)
-  ☑ Labels with spaces/Chinese use quoted form: `ID["label text"]`
--->
 ```mermaid
 flowchart TB
     subgraph {{ LAYER_1 }}["{{ LAYER_1_LABEL }}"]

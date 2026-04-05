@@ -18,10 +18,10 @@
 
 ```mermaid
 flowchart TB
-    index["Homepage / 首页"]
-    arch["Architecture / 架构"]
-    gs["Getting Started / 快速开始"]
-    docmap["Doc Map / 文档地图"]
+    index["{{ HOME_LABEL }}"]
+    arch["{{ ARCH_LABEL }}"]
+    gs["{{ GS_LABEL }}"]
+    docmap["{{ DOCMAP_LABEL }}"]
 
     subgraph {{ DOMAIN_1 }}["{{ DOMAIN_1_LABEL }}"]
         {{ DOMAIN_1_MOD_1 }}["{{ DOMAIN_1_MOD_1_LABEL }}"]

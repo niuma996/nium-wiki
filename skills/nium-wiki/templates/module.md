@@ -33,7 +33,8 @@
 ## 2. Architecture Position / 架构位置图
 
 <!--
-  MANDATORY: Mermaid diagram highlighting this module's position in the system.
+  SKIP in incremental mode if the module's position in the architecture has not changed.
+  MANDATORY for new generation.
   Use style to highlight the current module.
 -->
 
@@ -76,7 +77,8 @@ flowchart TB
 ## 5. Core Workflow Diagram / 核心工作流图
 
 <!--
-  MANDATORY: Mermaid flowchart showing the core workflow.
+  SKIP in incremental mode if the workflow has not changed.
+  MANDATORY for new generation.
 -->
 
 ```mermaid
@@ -99,6 +101,17 @@ flowchart TD
   Skip this section entirely for stateless utility/transform modules.
 
   Use Mermaid stateDiagram-v2 to show state transitions.
+
+  Example:
+  ```mermaid
+  stateDiagram-v2
+      [*] --> Idle
+      Idle --> Processing: start()
+      Processing --> Success: complete
+      Processing --> Error: fail
+      Success --> [*]
+      Error --> Idle: retry
+  ```
 -->
 
 ## 7. API Summary / API 概览
@@ -124,12 +137,14 @@ flowchart TD
 
 ### Quick Start / 快速开始
 
+<!-- Source: [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }}) -->
 ```{{ LANGUAGE }}
 {{ QUICK_START_CODE }}
 ```
 
 ### Example: {{ SCENARIO_2 }}
 
+<!-- Source: [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }}) -->
 ```{{ LANGUAGE }}
 {{ EXAMPLE_2_CODE }}
 ```

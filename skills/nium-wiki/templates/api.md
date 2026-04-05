@@ -20,6 +20,7 @@
 
 {{ MODULE_OVERVIEW }}
 
+<!-- Source: [{{ IMPORT_SOURCE_FILE }}](/{{ IMPORT_SOURCE_PATH }}#L{{ IMPORT_START }}-L{{ IMPORT_END }}) -->
 ```{{ LANGUAGE }}
 {{ IMPORT_EXAMPLE }}
 ```
@@ -44,6 +45,7 @@
 
 ### `{{ TYPE_NAME }}`
 
+<!-- Source: [{{ TYPE_SOURCE_FILE }}](/{{ TYPE_SOURCE_PATH }}#L{{ TYPE_START }}-L{{ TYPE_END }}) -->
 ```{{ LANGUAGE }}
 {{ TYPE_DEFINITION }}
 ```
@@ -98,50 +100,21 @@
 **Section sources**
 - [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }})
 
-## Classes / 类
+## Type Relationships / 类型关系图
 
 <!--
-  For each class: class diagram, constructor, properties, methods.
+  OPTIONAL: Include only if the module has multiple types/interfaces with meaningful relationships.
+  Use flowchart LR to show how types relate (implements, extends, uses, etc.).
+  Omit if the module has only one or two simple types.
 -->
 
-### `{{ CLASS_NAME }}`
-
 ```mermaid
-classDiagram
-class {{ CLASS_NAME }} {
-    +{{ PROPERTY_1 }} : {{ PROP_TYPE_1 }}
-    +{{ PROPERTY_2 }} : {{ PROP_TYPE_2 }}
-    -{{ PRIVATE_FIELD }} : {{ PRIV_TYPE }}
-    +{{ METHOD_1 }}({{ PARAM }} : {{ PARAM_TYPE }}) : {{ RETURN_TYPE }}
-    +{{ METHOD_2 }}() : void
-}
+flowchart LR
+    %% Show type/module relationships: implements, uses, extends, etc.
+    TypeA[TypeA] -->|uses| TypeB[TypeB]
+    TypeB -->|returns| TypeC[TypeC]
+    TypeA -.->|implements| TypeI[Interface]
 ```
-
-#### Constructor / 构造函数
-
-```{{ LANGUAGE }}
-{{ CONSTRUCTOR_SIGNATURE }}
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| {{ CTOR_PARAM_1 }} | `{{ CTOR_PARAM_1_TYPE }}` | {{ CTOR_PARAM_1_DESC }} |
-
-#### Properties / 属性
-
-| Property | Type | Access | Description |
-|----------|------|--------|-------------|
-| {{ PROP_1 }} | `{{ PROP_1_TYPE }}` | {{ ACCESS }} | {{ PROP_1_DESC }} |
-
-#### Methods / 方法
-
-##### `{{ METHOD_NAME }}`
-
-```{{ LANGUAGE }}
-{{ METHOD_SIGNATURE }}
-```
-
-{{ METHOD_DESCRIPTION }}
 
 ## Usage Patterns / 使用模式
 
@@ -163,6 +136,17 @@ class {{ CLASS_NAME }} {
   OPTIONAL: Include for complex APIs with common pitfalls.
   Skip this section for straightforward APIs.
 -->
+
+## Deprecated APIs / 废弃 API
+
+<!--
+  OPTIONAL: Include only if the module has deprecated APIs.
+  For each deprecated API, document what to use instead.
+-->
+
+| Deprecated API | Replacement | Removed In | Migration Guide |
+|----------------|-------------|------------|----------------|
+| `{{ DEPRECATED_API }}` | `{{ REPLACEMENT_API }}` | `{{ VERSION }}` | {{ MIGRATION_GUIDE }} |
 
 ## Related Documents / 相关文档
 

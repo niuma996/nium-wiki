@@ -82,13 +82,13 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 | System architecture | `flowchart TB` with subgraphs | always |
 | Request / data flow | `sequenceDiagram` | always |
 | Lifecycle / state transitions | `stateDiagram-v2` | only for stateful modules |
-| **Class / Interface shape** | `classDiagram` with properties + methods | always |
+| **Class / Interface shape** | `flowchart LR` showing type/module relationships | only when source is read |
 | Module dependencies | `flowchart LR` | always |
 | Data models / ORM | `erDiagram` | when project has database/ORM |
 | Module conceptual relationships | `mindmap` | optional, for abstract module relationships only (NOT file trees) |
 
 > **Diagram diversity**: Count ≥ 2 distinct diagram *types* toward the minimum. Three identical
-> flowcharts do not satisfy the requirement — use `classDiagram`, `sequenceDiagram`,
+> flowcharts do not satisfy the requirement — use `flowchart LR`, `sequenceDiagram`,
 > `stateDiagram-v2`, `erDiagram` as appropriate for the module.
 >
 > **Note**: `mindmap` is optional and does **not** count toward the ≥ 2 distinct types requirement. It may supplement but never replace the required diagram types above.
@@ -98,113 +98,49 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 > **File/directory structure** MUST use plain-text tree format (`├──` `└──`), NEVER use Mermaid diagrams (including `mindmap`).
 > Mermaid `mindmap` is only for showing abstract conceptual relationships between modules, never for file paths or directory trees.
 
-### 🔴 Mermaid Syntax Safety Rules (v10.9+ Compatible)
+### 🔴 Mermaid Syntax Safety Rules (MANDATORY — Read Before Every Diagram)
 
-> ⚠️ **These rules are enforced before every diagram generation.**
-> Skipping them causes silent render failures (blank or broken diagram). **Read and apply before writing any Mermaid block.**
+> ⚠️ **HARD REQUIREMENT**: Before generating ANY Mermaid diagram, you MUST read
+> [refs/mermaid-syntax.md](./refs/mermaid-syntax.md) in full. Generating without reading
+> this file is a hard requirement violation and causes **silent render failures**.
 
-**Complexity grouping** (flowcharts > 6 nodes):
+**Core principle**: IDs = English alphanumeric | Labels = unquoted | Special chars = HTML entities
 
-| Nodes | Strategy |
-|-------|----------|
+| # | Rule | Wrong ❌ | Correct ✅ |
+|---|------|----------|------------|
+| 1 | Plain labels need no quotes | `A["CLI"]` | `A[CLI]` |
+| 2 | IDs must be `[a-zA-Z0-9_]` only | `Core.1[Core]` | `Core_1[Core]` |
+| 3 | subgraph IDs must be English | `subgraph 核心层[...]` | `subgraph Core[...]` |
+| 4 | subgraph ID must not collide with node ID | `subgraph CLI[...]\nCLI[...]` | `subgraph CL[...]\nCLI[...]` |
+| 5 | Inner quotes use `&quot;` | `A[Config "x" val]` | `A[Config &quot;x&quot; val]` |
+| 6 | sequenceDiagram participants alphanumeric | `participant User.1` | `participant User_1` |
+| 7 | Avoid Mermaid reserved words as IDs | `class[class]` | `NodeClass[class]` |
+
+**Complexity grouping** (when nodes > 6):
+
+| Node Count | Strategy |
+|------------|----------|
 | ≤ 6 | Linear — no grouping needed |
-| 7-12 | `subgraph` grouping (2-4 per group, max 5) |
+| 7-12 | `subgraph` grouping, 2-4 nodes per group |
 | 13-20 | Layered abstraction (overview + detail) |
 | > 20 | Split into multiple diagrams |
 
-**Rule 1 — Node labels: no quotes around plain labels:**
-
-Mermaid's `ID[label]` format does **not** use quotes around plain labels.
+**Example — Grouped vs waterfall**:
 
 ```mermaid
-%% WRONG — quoted plain label triggers audit-docs rule 6 error
-%% A["CLI Entry"]
-
-%% CORRECT — plain unquoted labels
+%% WRONG — narrow waterfall
 flowchart TD
-    A[CLI Entry] --> B[Source Index]
-```
-
-**Rule 2 — Node IDs must be alphanumeric only:**
-
-```mermaid
-%% WRONG — non-alphanumeric ID
+    A --> B --> C --> D --> E --> F --> G --> H
+%% CORRECT — grouped by phase
 flowchart TD
-    CoreModule.123[Core Module]
-
-%% CORRECT
-flowchart TD
-    CoreModule_123[Core Module]
-    CoreModule[Core Module]
-```
-
-**Rule 3 — subgraph IDs must be English alphanumeric (no Chinese/non-ASCII):**
-
-```mermaid
-%% WRONG — non-ASCII subgraph ID
-subgraph 核心层[Core Layer]
-
-%% CORRECT — English alphanumeric subgraph ID
-subgraph CoreLayer[Core Layer]
-```
-
-**Rule 4 — subgraph ID must not collide with node ID namespace (shared namespace):**
-
-```mermaid
-%% WRONG — subgraph ID "CLI" collides with node ID "CLI"
-flowchart TB
-    subgraph CLI[CLI Layer]
-        CLI_node[cli.ts] --> C2[commands]
+    subgraph Phase1[Phase 1]
+        A --> B
     end
-    CLI_node --> A[Analyzer]  %% ERROR: CLI already used as subgraph ID
-
-%% CORRECT — subgraph ID distinct from all node IDs
-flowchart TB
-    subgraph CL[CLI Layer]
-        CLI_node[cli.ts] --> C2[commands]
+    subgraph Phase2[Phase 2]
+        C --> D --> E
     end
-    CLI_node --> A[Analyzer]
-    CL --> A
+    Phase1 --> Phase2
 ```
-
-**Rule 5 — Inner quotes must use HTML entities (in unquoted labels):**
-
-```mermaid
-%% WRONG — unescaped nested quotes inside label
-flowchart TD
-    A[Config "key" value]
-
-%% CORRECT — escaped inner quotes
-flowchart TD
-    A[Config &quot;key&quot; value]
-```
-
-**Rule 6 — sequenceDiagram participants must be alphanumeric:**
-
-```mermaid
-%% WRONG — non-alphanumeric participant ID (dot is not allowed)
-participant User.123
-
-%% CORRECT — alphanumeric only (underscore is allowed)
-participant User_123
-participant User as U
-```
-
-**Rule 7 — Avoid Mermaid reserved words as bare IDs:**
-
-```mermaid
-%% WRONG — "class" is a reserved word
-flowchart TD
-    class[class]
-
-%% CORRECT — rename to avoid conflict
-flowchart TD
-    NodeClass[class]
-```
-
-**One-line principle**: IDs: English alphanumeric | Labels: unquoted | Special chars: HTML entities.
-
-> **Full reference**: [mermaid-syntax.md](./refs/mermaid-syntax.md) — comprehensive cheat sheet for edge cases
 
 ### 🔴 MANDATORY: Source File Back-References
 
@@ -218,6 +154,28 @@ flowchart TD
 **Diagram data sources**
 - [core/analyzeProject.ts](/src/core/analyzeProject.ts#L1-L100)
 ```
+
+### 🔴 MANDATORY: Source Attribution for Code Block Excerpts
+
+Any code block that is a direct excerpt from a source file (function body, class definition, type definition, import/export statement) MUST carry a source attribution comment immediately above the block. This applies to `.ts`, `.js`, `.py`, `.go`, `.rs`, `.java`, and other language source files.
+
+```markdown
+// Source: [cli.ts](/src/cli.ts#L42-L67)
+```typescript
+const result = cli.parse(process.argv);
+```
+```
+
+Attribution is **not required** for:
+
+| Content type | Example | Why no attribution |
+|---|---|---|
+| Usage / call-site examples | `cli.run(['--help'])` | Calling code, not source excerpt |
+| Teaching / invented examples | Any code that does not exist in the source | Not in any source file |
+| Mermaid / shell / CLI commands | `flowchart TD\n  A --> B` | Not source code |
+| Output / runtime results | `// Output: { id: 1 }` | Results, not source |
+
+The attribution comment is a markdown HTML comment (`<!-- -->`) so it does not render in the output wiki. It is a metadata signal for readers and for the `build-index` pipeline.
 
 ### 🔴 MANDATORY: Complexity-Scaled Quality Targets
 
@@ -279,7 +237,15 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 | 5 | **Best Practices** | ⚡ OPTIONAL |
 | 6 | **Related Docs** | Cross-links |
 
-**Template selection**: Before generating each module's documentation, run `nium-wiki analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use the output as **context** — the `roleRecommendation` and `templateRecommendation` are based on quantifiable metrics (export count, complexity score, dependency stats) but are **overrideable**: your semantic understanding of the module's business role takes precedence.
+**Template selection**: Before generating each module's documentation, run `nium-wiki analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal:
+
+| `docScope` | Use this template | Lines target | Diagrams |
+|---|---|---|---|
+| `core` | `module.md` (11-section) | 400+ | 2+ distinct types required |
+| `overview` | `overview.md` (5-section) | 80-150 | optional |
+| `_index` | `_index.md` only | 30-50 | none |
+
+The `templateRecommendation` and `roleRecommendation` are based on quantifiable metrics but are **overrideable**: your semantic understanding of the module's business role takes precedence.
 
 > Code provides signals. You make the final decision.
 
@@ -294,25 +260,28 @@ Every code example must:
 5. **Tiered examples for core APIs** (minimum 5 examples per core doc): Three levels — basic usage, advanced usage, and error handling — for each major exported function
 6. **Sanitized secrets**: NO actual credentials — use placeholders (see "Secret & Credential Sanitization" above)
 
-### 🔴 MANDATORY: classDiagram for Every Core Class
-
-Each core class or interface MUST have an accompanying classDiagram showing its full shape:
-
-```mermaid
-classDiagram
-class ClassName {
-  +property1 : Type
-  +property2 : Type
-  -privateField : Type
-  +method1(param : Type) : ReturnType
-  +method2() : void
-}
-```
-
 ### Cross-Document Linking
 - Every document MUST contain a **"Related Documents"** section at the end
 - Module docs should link outward to: architecture position, API reference, dependency graph
 - API docs should link back to: parent module, usage examples, type definitions
+
+---
+
+## Mode Overrides
+
+> **Applies when**: Running in incremental mode, triggered by the `incremental` pipeline.
+> **Priority**: These overrides take precedence over the Quality Gate rules above.
+> See [Surgical Edit: Modifying Existing Docs](#surgical-edit-modifying-existing-docs) for the full execution guide.
+
+| Quality Gate Rule | Incremental Mode Behavior |
+|---|---|
+| core doc ≥ 5 code examples | Add **0–1 example** only when a new API is introduced by the changed source |
+| ≥ 2 distinct diagram types | **Do NOT regenerate any diagram** — preserve existing diagrams unchanged |
+| Full 11-section `module.md` template | **Patch only the affected section(s)** listed in `triggeredBy` |
+| `flowchart LR` for type/module relationships | **Skip** unless the class was modified **and** its source was read |
+| API summary must cover all exports | **Only cover exports that changed** |
+| core doc ≥ 400 lines | **No minimum** — a 50-line targeted patch is preferable to a 400-line rewrite |
+| ≥ 3 source reference links | **Only links related to changed source files** |
 
 ---
 
@@ -563,16 +532,7 @@ Run `cd scripts && node index.js i18n status` again to verify all files show as 
 > **global Quality Gate rules above do NOT apply** to existing docs being surgically patched.
 > Applying those rules blindly is the primary cause of oversized diffs and unnecessary rewrites.
 
-**What the global Quality Gate controls — and what incremental mode does instead:**
-
-| Global Quality Gate Rule | Incremental Mode Behavior |
-|--------------------------|--------------------------|
-| ≥ 5 code examples per core doc | Add **0–1 example** only when a new API is introduced by the changed source |
-| ≥ 2 distinct diagram types per doc | **Do NOT regenerate any diagram** — preserve existing diagrams unchanged |
-| Full 11-section `module.md` template | **Patch only the affected section(s)** listed in `triggeredBy` |
-| Every class must have a `classDiagram` | **Skip** unless the class itself was modified |
-| API summary must cover all exports | **Only cover exports that changed** |
-| ≥ 400 lines per core doc | **No minimum** — a 50-line targeted patch is preferable to a 400-line rewrite |
+**See [Mode Overrides](#mode-overrides) for the full table of Quality Gate rule overrides in incremental mode.**
 
 **`updateStrength` from the `incremental` pipeline controls patch depth:**
 

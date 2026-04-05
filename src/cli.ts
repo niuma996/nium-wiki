@@ -23,7 +23,7 @@ import {
 } from './core/auditDocs';
 import { generateToc, generateSidebar } from './generation/generateToc';
 import { buildDocIndex, enrichWithInference, saveDocIndex } from './core/buildDocIndex';
-import { buildDependencyGraph, saveDependencyGraph } from './core/buildDeps';
+import { buildDependencyGraph, saveDependencyGraph, loadDependencyGraph } from './core/buildDeps';
 import {
   buildIncrementalPlan,
   printIncrementalPlan,
@@ -76,10 +76,13 @@ program
   .description('Analyze project structure, tech stack, and modules')
   .argument('[project-path]', 'Project root directory', process.cwd())
   .option('--no-cache', 'Do not save to cache')
-  .action(async (projectPath: string, opts: { cache: boolean }) => {
+  .option('--verbose', 'Show file list per module')
+  .action(async (projectPath: string, opts: { cache: boolean; verbose: boolean }) => {
     const resolved = path.resolve(projectPath);
-    const result = await analyzeProject(resolved, opts.cache);
-    printAnalysis(result);
+    // Only load dep-graph when --verbose is needed for file importance sorting
+    const importedBy = opts.verbose ? loadDependencyGraph(resolved)?.importedBy : undefined;
+    const result = await analyzeProject(resolved, opts.cache, importedBy);
+    printAnalysis(result, opts.verbose);
   });
 
 // ── analyze-module ───────────────────────────────────────────

@@ -6,16 +6,30 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { languageHandlerManager } from '../language-handlers/index';
-import { IGNORE_FILES } from '../utils/patterns';
 import { getExcludeDirs } from '../utils/config';
 import { walkFiles } from '../utils/fileWalker';
 import { saveCache } from '../utils/cache';
+
+export interface ModuleFileInfo {
+  /** Relative file path within the module, e.g. "client.ts" */
+  name: string;
+  /** Full relative path from project root, e.g. "services/mcp/client.ts" */
+  fullPath: string;
+  /** Estimated line count (sampled) */
+  lines: number;
+  /** Number of files that import this file */
+  importedBy: number;
+  /** Whether this is an entry/index file */
+  isEntry: boolean;
+}
 
 export interface ModuleInfo {
   name: string;
   path: string;
   files: number;
   type: string;
+  /** 所有源文件列表（含重要性排序），不含内容 */
+  filesList?: ModuleFileInfo[];
   /** 语义角色（来自 analyze-module 的推荐，可覆盖） */
   role?: 'core' | 'api' | 'utility' | 'ui' | 'test' | 'config' | 'unknown';
   /** 推荐的文档模板（来自 analyze-module 的推荐，可覆盖） */
@@ -146,40 +160,192 @@ function countCodeFiles(dirPath: string, excludeDirs: Set<string>): number {
   return walkFiles(dirPath, { extensions: getCodeExtensions(), excludeDirs }).length;
 }
 
-function discoverModules(rootPath: string, excludeDirs: Set<string>): ModuleInfo[] {
-  const modules: ModuleInfo[] = [];
-  const srcDirs = ['src', 'lib', 'packages', 'apps', 'modules', 'app', 'cmd', 'internal'];
+/**
+ * Count lines in a file. For small files counts exactly; for large files,
+ * reads the full content (no fast sampling implemented yet).
+ */
+function estimateLines(absPath: string): number {
+  try {
+    const content = fs.readFileSync(absPath, 'utf-8');
+    return content.split('\n').length;
+  } catch {
+    return 0;
+  }
+}
 
-  for (const srcDir of srcDirs) {
-    const srcPath = path.join(rootPath, srcDir);
-    if (!fs.existsSync(srcPath)) continue;
+/**
+ * Is this file likely an entry point or index?
+ */
+function isEntryFile(name: string): boolean {
+  const base = path.basename(name, path.extname(name)).toLowerCase();
+  return ['index', 'main', 'entry', 'app'].includes(base);
+}
 
+/**
+ * Sort files by importance: importedBy desc, lines desc, isEntry desc.
+ * Score = importedBy * 3 + lines/10 + (isEntry ? 20 : 0)
+ */
+function sortFilesByImportance(files: ModuleFileInfo[]): ModuleFileInfo[] {
+  return [...files].sort((a, b) => {
+    const scoreA = a.importedBy * 3 + Math.floor(a.lines / 10) + (a.isEntry ? 20 : 0);
+    const scoreB = b.importedBy * 3 + Math.floor(b.lines / 10) + (b.isEntry ? 20 : 0);
+    return scoreB - scoreA;
+  });
+}
+
+/**
+ * Build filesList for a module, optionally enriched with dep-graph importedBy counts.
+ * @param modulePath - Absolute path to the module directory
+ * @param moduleRelPath - Relative path from project root (e.g. "services/mcp")
+ * @param excludeDirs - Directories to exclude
+ * @param importedBy - Optional importedBy map from dep-graph.json (file relpath -> files that import it)
+ */
+function buildFilesList(
+  modulePath: string,
+  moduleRelPath: string,
+  excludeDirs: Set<string>,
+  importedBy?: Record<string, string[]>,
+): ModuleFileInfo[] {
+  const allFiles = walkFiles(modulePath, { extensions: getCodeExtensions(), excludeDirs, relative: false });
+
+  const infos: ModuleFileInfo[] = allFiles.map(absPath => {
+    const name = path.basename(absPath);
+    const fullRelPath = moduleRelPath + '/' + name;
+    const ib = importedBy?.[fullRelPath]?.length ?? 0;
+
+    return {
+      name,
+      fullPath: fullRelPath,
+      lines: estimateLines(absPath),
+      importedBy: ib,
+      isEntry: isEntryFile(name),
+    };
+  });
+
+  return sortFilesByImportance(infos);
+}
+
+/**
+ * Find all source subdirectories recursively.
+ * Checks DIRECT children only (not deeply nested) to determine hasCode status.
+ *
+ * For "src/services/":
+ *   - Scan src/services/ entries: only check files/dirs directly inside (not recursive)
+ *   - services/mcp/ has code files → hasCode = true for services/mcp/
+ *   - services/ itself has no direct code files → NOT added to result
+ *   - services/mcp/ returns itself → returned as deeply-nested module
+ */
+function findSourceSubDirs(basePath: string, excludeDirs: Set<string>): string[] {
+  const result: string[] = [];
+  const codeExts = new Set(getCodeExtensions());
+
+  function scan(dir: string, codeExts: Set<string>): void {
     try {
-      const entries = fs.readdirSync(srcPath, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && !excludeDirs.has(entry.name)) {
-          const fullPath = path.join(srcPath, entry.name);
-          const fileCount = countCodeFiles(fullPath, excludeDirs);
-          if (fileCount > 0) {
-            modules.push({
-              name: entry.name,
-              path: path.relative(rootPath, fullPath).replace(/\\/g, '/'),
-              files: fileCount,
-              type: categorizeModule(entry.name),
-            });
-          }
-        }
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+      // Check only direct children for code files (not recursive)
+      const hasDirectCode = entries.some(
+        e => e.isFile() && codeExts.has(path.extname(e.name)),
+      );
+
+      // Check for subdirectories
+      const subDirs = entries.filter(
+        e => e.isDirectory() && !excludeDirs.has(e.name) && !e.name.startsWith('.'),
+      );
+
+      if (hasDirectCode) {
+        result.push(dir);
+      }
+
+      // Recurse into subdirectories
+      for (const sub of subDirs) {
+        scan(path.join(dir, sub.name), codeExts);
       }
     } catch { /* ignore */ }
   }
 
-  // 如果没有找到明确的模块，尝试根目录下的主要目录 / If no explicit modules found, try major directories in root
+  scan(basePath, codeExts);
+  return result;
+}
+
+/**
+ * Discover modules under a src/ directory.
+ * Treats each immediate subdirectory of src/ as a module.
+ * For nested structures (src/services/mcp/), each level gets its own module.
+ */
+function discoverModulesUnderSrc(
+  srcPath: string,
+  rootPath: string,
+  excludeDirs: Set<string>,
+): ModuleInfo[] {
+  const modules: ModuleInfo[] = [];
+
+  try {
+    const entries = fs.readdirSync(srcPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || excludeDirs.has(entry.name) || entry.name.startsWith('.')) {
+        continue;
+      }
+
+      const subPath = path.join(srcPath, entry.name);
+
+      // Check if this subdirectory is itself a src/ equivalent (has sub-subdirs with code)
+      // If so, treat it as a module and also recurse into its children
+      const isDeeplyNested = findSourceSubDirs(subPath, excludeDirs).length > 1;
+
+      if (isDeeplyNested) {
+        // This is a "root" of a nested source tree (e.g. src/services/)
+        // Find all sub-modules under it
+        const subModules = discoverModulesUnderSrc(subPath, rootPath, excludeDirs);
+        modules.push(...subModules);
+      } else {
+        // Regular module (e.g. src/utils/, src/components/)
+        const fileCount = countCodeFiles(subPath, excludeDirs);
+        if (fileCount > 0) {
+          modules.push({
+            name: entry.name,
+            path: path.relative(rootPath, subPath).replace(/\\/g, '/'),
+            files: fileCount,
+            type: categorizeModule(entry.name),
+          });
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  return modules;
+}
+
+function discoverModules(
+  rootPath: string,
+  excludeDirs: Set<string>,
+): ModuleInfo[] {
+  const modules: ModuleInfo[] = [];
+  const srcDirNames = ['src', 'lib', 'packages', 'apps', 'modules', 'app', 'cmd', 'internal'];
+
+  // Pass 1: find named srcDirs at project root
+  for (const srcDir of srcDirNames) {
+    const srcPath = path.join(rootPath, srcDir);
+    if (!fs.existsSync(srcPath)) continue;
+    const found = discoverModulesUnderSrc(srcPath, rootPath, excludeDirs);
+    modules.push(...found);
+  }
+
+  // Pass 2: for nested projects like "*/src/", "*/src/*", scan root-level dirs
   if (modules.length === 0) {
     try {
       const entries = fs.readdirSync(rootPath, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.isDirectory() && !excludeDirs.has(entry.name) && !entry.name.startsWith('.')) {
-          const fullPath = path.join(rootPath, entry.name);
+        if (!entry.isDirectory() || excludeDirs.has(entry.name) || entry.name.startsWith('.')) {
+          continue;
+        }
+        const fullPath = path.join(rootPath, entry.name);
+        // Look for nested src/ equivalent inside this directory
+        const nestedFound = discoverModulesUnderSrc(fullPath, rootPath, excludeDirs);
+        if (nestedFound.length > 0) {
+          modules.push(...nestedFound);
+        } else {
+          // No nested source dirs — treat as a flat module
           const fileCount = countCodeFiles(fullPath, excludeDirs);
           if (fileCount > 0) {
             modules.push({
@@ -230,13 +396,23 @@ function collectAllCodeFiles(rootPath: string, excludeDirs: Set<string>): string
   return walkFiles(rootPath, { extensions: getCodeExtensions(), excludeDirs, relative: true });
 }
 
-export async function analyzeProject(projectRoot: string, saveToCache = true): Promise<ProjectAnalysis> {
+export async function analyzeProject(
+  projectRoot: string,
+  saveToCache = true,
+  importedBy?: Record<string, string[]>,
+): Promise<ProjectAnalysis> {
   const excludeDirs = getExcludeDirs(projectRoot);
   const projectTypes = await detectProjectTypes(projectRoot);
   const entryPoints = await findEntryPoints(projectRoot, projectTypes, excludeDirs);
   const modules = discoverModules(projectRoot, excludeDirs);
   const docs = findDocumentation(projectRoot);
   const codeFiles = collectAllCodeFiles(projectRoot, excludeDirs);
+
+  // Build filesList for each module (enriched with importedBy counts if dep-graph available)
+  for (const mod of modules) {
+    const absModulePath = path.join(projectRoot, mod.path);
+    mod.filesList = buildFilesList(absModulePath, mod.path, excludeDirs, importedBy);
+  }
 
   const result: ProjectAnalysis = {
     projectName: path.basename(projectRoot),
@@ -262,7 +438,7 @@ export async function analyzeProject(projectRoot: string, saveToCache = true): P
   return result;
 }
 
-export function printAnalysis(result: ProjectAnalysis): void {
+export function printAnalysis(result: ProjectAnalysis, verbose = false): void {
   console.log(`📁 Project: ${result.projectName}`);
   console.log(`🔧 Tech Stack: ${result.projectType.join(', ') || 'Unknown'}`);
   console.log(
@@ -280,8 +456,17 @@ export function printAnalysis(result: ProjectAnalysis): void {
 
   if (result.modules.length) {
     console.log('\n📦 Modules:');
-    for (const mod of result.modules.slice(0, 10)) {
-      console.log(`  - ${mod.name} (${mod.files} files)`);
+    for (const mod of result.modules.slice(0, 20)) {
+      console.log(`  - ${mod.name} (${mod.files} files) [${mod.type}]`);
+      if (verbose && mod.filesList && mod.filesList.length > 0) {
+        for (const f of mod.filesList.slice(0, 10)) {
+          const entryTag = f.isEntry ? ' ★' : '';
+          console.log(`      ${f.name} (importedBy:${f.importedBy}, lines:${f.lines})${entryTag}`);
+        }
+        if (mod.filesList.length > 10) {
+          console.log(`      ... and ${mod.filesList.length - 10} more files`);
+        }
+      }
     }
   }
 

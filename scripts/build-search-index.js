@@ -45,16 +45,28 @@ function walkDir(dir) {
           ? titleMatch[1].trim()
           : entry.name.replace(/\.md$/, '').replace(/[-_]/g, ' ');
 
-        // Strip markdown syntax for body text
-        const body = content
-          .replace(/^---[\s\S]*?---\n/, '')       // frontmatter
+        // Nium-Wiki files use --- at the start as empty frontmatter convention (---\n\n# Title)
+        // and --- near the end as the footer separator (---\n*Footer*).
+        // These two --- markers are the SAME string in files with no real frontmatter content,
+        // so we must handle them carefully to avoid eating all content.
+        let bodyContent = content;
+        if (bodyContent.startsWith('---\n\n')) {
+          bodyContent = bodyContent.substring(4); // strip frontmatter opener ---\n\n
+        }
+        // Strip footer: \n---\n followed by footer content at end of file
+        const footerMatch = bodyContent.match(/\n---\n([\s\S]*)$/);
+        if (footerMatch) {
+          bodyContent = bodyContent.substring(0, bodyContent.length - footerMatch[0].length);
+        }
+
+        const body = bodyContent
           .replace(/```[\s\S]*?```/g, '')         // code blocks
           .replace(/`[^`]+`/g, '')               // inline code
           .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links -> text
           .replace(/[*_~#]+([^*_\n]+)[*_~#]*/g, '$1') // bold/italic
           .replace(/^#+\s+/gm, '')              // headings
           .replace(/^[-*+]\s+/gm, '')            // list bullets
-          .replace(/^\s+|s+$/gm, '')            // leading/trailing spaces
+          .replace(/^\s+|\s+$/gm, '')            // leading/trailing whitespace
           .replace(/\n{3,}/g, '\n\n')           // extra blank lines
           .substring(0, MAX_BODY_LEN);
 

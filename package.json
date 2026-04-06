@@ -1,6 +1,6 @@
 {
   "name": "nium-wiki",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Professional-grade structured project Wiki generator, powered by AI coding tools",
   "main": "dist/serve.js",
   "bin": {

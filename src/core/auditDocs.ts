@@ -164,7 +164,7 @@ function countEmptySections(lines: string[]): { count: number; titles: string[] 
     if (!/^#{2,3} /.test(lines[i])) continue;
     let hasContent = false;
     for (let j = i + 1; j < lines.length; j++) {
-      if (/^#{1,3} /.test(lines[j])) break;
+      if (/^## /.test(lines[j])) break;
       if (lines[j].trim().length > 0) { hasContent = true; break; }
     }
     if (!hasContent) {

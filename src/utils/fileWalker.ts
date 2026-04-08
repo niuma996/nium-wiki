@@ -45,7 +45,9 @@ export function walkFiles(rootDir: string, options: WalkOptions = {}): string[] 
           }
         }
       }
-    } catch { /* ignore unreadable dirs */ }
+    } catch (err) {
+      console.warn(`[fileWalker] skip unreadable: ${dir} — ${(err as Error).message}`);
+    }
   }
 
   walk(rootDir);

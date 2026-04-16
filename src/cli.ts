@@ -10,6 +10,40 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getVersion } from './utils/version';
 
+/** 验证项目根目录：确认 .nium-wiki 目录存在 / Validate project root: confirm .nium-wiki directory exists */
+function requireWikiDir(resolvedProjectRoot: string): boolean {
+  const wikiDir = path.join(resolvedProjectRoot, '.nium-wiki');
+  if (fs.existsSync(wikiDir)) return true;
+
+  // 标准化路径：去除末尾斜杠，避免 path.dirname 对 /root/skills/ 和 /root/skills 处理不一致
+  const normalized = resolvedProjectRoot.replace(/\/$/, '');
+  const parentDir = path.dirname(normalized);
+  const parentWiki = path.join(parentDir, '.nium-wiki');
+
+  if (fs.existsSync(parentWiki)) {
+    // .nium-wiki 在父目录中：检查 resolved 是否在 wiki 目录内部
+    // resolved.startsWith(parentWiki) 或 resolved === parentWiki 时，用户在 .nium-wiki/ 内或其本身
+    const normalizedResolved = resolvedProjectRoot.replace(/\/$/, '');
+    if (normalizedResolved === parentWiki || normalizedResolved.startsWith(parentWiki + '/')) {
+      // 用户在 .nium-wiki/ 内执行（或传入了 .nium-wiki/ 本身）
+      console.error(`❌ Cannot run from inside .nium-wiki/ directory.`);
+      console.error(`   Current directory: ${resolvedProjectRoot}`);
+      console.error(`   Run from project root: ${parentDir}`);
+      console.error(`   Or pass the path explicitly:  nium-wiki <command> ${parentDir}`);
+    } else {
+      // .nium-wiki 在项目父目录，但 resolved 不是其内部（正常场景：用户在项目根目录）
+      // 此时 wikiDir 不存在但 parentWiki 存在 = 正常，不需要报错
+      // 这种情况不应发生，因为最外层已 return true
+      console.error(`❌ .nium-wiki directory not found in: ${resolvedProjectRoot}`);
+      console.error(`   Please run 'nium-wiki init' first to initialize.`);
+    }
+  } else {
+    console.error(`❌ .nium-wiki directory not found in: ${resolvedProjectRoot}`);
+    console.error(`   Please run 'nium-wiki init' first to initialize.`);
+  }
+  return false;
+}
+
 import { initNiumWiki, printInitResult } from './infra/initWiki';
 import { getOsLang, loadI18nConfig } from './utils/i18n';
 import { analyzeProject, printAnalysis } from './core/analyzeProject';
@@ -33,6 +67,7 @@ import {
   checkSyncStatus,
   printSyncStatus,
   syncMemory,
+  initMemory,
 } from './utils/i18n';
 import {
   analyzeModule,
@@ -79,7 +114,7 @@ program
   .option('--verbose', 'Show file list per module')
   .action(async (projectPath: string, opts: { cache: boolean; verbose: boolean }) => {
     const resolved = path.resolve(projectPath);
-    // Only load dep-graph when --verbose is needed for file importance sorting
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
     const importedBy = opts.verbose ? loadDependencyGraph(resolved)?.importedBy : undefined;
     const result = await analyzeProject(resolved, opts.cache, importedBy);
     printAnalysis(result, opts.verbose);
@@ -138,6 +173,7 @@ program
   .option('--no-update', 'Only detect changes, do not update hash cache')
   .action((projectPath: string, opts: { update: boolean }) => {
     const resolved = path.resolve(projectPath);
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
     const changes = diffSourceIndex(resolved);
     printSourceDiff(changes);
     if (opts.update) {
@@ -158,12 +194,7 @@ program
   .option('-v, --verbose', 'Show preserved docs list')
   .action((projectPath: string, opts: { commit: boolean; maxDepth: string; verbose: boolean }) => {
     const resolved = path.resolve(projectPath);
-    const wikiDir = path.join(resolved, '.nium-wiki');
-    if (!fs.existsSync(wikiDir)) {
-      console.error('❌ .nium-wiki directory does not exist, please run init first');
-      process.exitCode = 1;
-      return;
-    }
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
 
     const plan = buildIncrementalPlan({
       projectRoot: resolved,
@@ -183,6 +214,7 @@ program
   .argument('[project-path]', 'Project root directory', process.cwd())
   .action((projectPath: string) => {
     const resolved = path.resolve(projectPath);
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
     const wikiDir = path.join(resolved, '.nium-wiki');
     if (!fs.existsSync(path.join(wikiDir, 'wiki'))) {
       console.error('❌ wiki directory does not exist, please generate docs first');
@@ -213,12 +245,7 @@ program
   .argument('[project-path]', 'Project root directory', process.cwd())
   .action((projectPath: string) => {
     const resolved = path.resolve(projectPath);
-    const wikiDir = path.join(resolved, '.nium-wiki');
-    if (!fs.existsSync(wikiDir)) {
-      console.error('❌ .nium-wiki directory does not exist, please run init first');
-      process.exitCode = 1;
-      return;
-    }
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
 
     const changes = diffSourceIndex(resolved);
     const liveFiles = [...changes.added, ...changes.modified, ...changes.unchanged];
@@ -236,6 +263,7 @@ program
   .argument('[project-path]', 'Project root directory', process.cwd())
   .action((projectPath: string) => {
     const resolved = path.resolve(projectPath);
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
     const wikiDir = path.join(resolved, '.nium-wiki', 'wiki');
     if (!fs.existsSync(wikiDir)) {
       console.error('❌ wiki directory does not exist, please generate docs first');
@@ -271,17 +299,23 @@ program
 program
   .command('audit-docs')
   .description('Check Wiki documentation quality')
-  .argument('[wiki-path]', '.nium-wiki directory path', '.nium-wiki')
+  .argument('[wiki-path]', '.nium-wiki directory path (or project root to auto-detect)', '.nium-wiki')
   .option('-v, --verbose', 'Show detailed issue list', false)
   .option('--json <file>', 'Save report as JSON file')
   .option('--mermaid-strict', 'Exit with non-zero code when Mermaid syntax errors are found (for CI)', false)
   .option('--role <role>', 'Default module role for quality expectations (overrides auto-detection): core | utility | index | auto', 'auto')
   .action((wikiPath: string, opts: { verbose: boolean; json?: string; mermaidStrict: boolean; role: string }) => {
-    const resolved = path.resolve(wikiPath);
-    if (!fs.existsSync(resolved)) {
-      console.error(`❌ Path does not exist: ${resolved}`);
-      process.exitCode = 1;
-      return;
+    let resolved = path.resolve(wikiPath);
+    // 如果传入的是项目根目录（没有 wiki/ 子目录），尝试向上找 .nium-wiki
+    if (!fs.existsSync(path.join(resolved, 'wiki'))) {
+      const candidate = path.join(resolved, '.nium-wiki');
+      if (fs.existsSync(candidate)) {
+        resolved = candidate;
+      } else if (!fs.existsSync(resolved)) {
+        console.error(`❌ Path does not exist: ${resolved}`);
+        process.exitCode = 1;
+        return;
+      }
     }
     const role = opts.role === 'auto' ? undefined : opts.role;
     const report = analyzeWiki(resolved, role);
@@ -324,7 +358,20 @@ i18nCmd
   .argument('[wiki-path]', '.nium-wiki directory path', '.nium-wiki')
   .option('--lang <code>', 'Only check specified language')
   .action((wikiPath: string, opts: { lang?: string }) => {
-    const resolved = path.resolve(wikiPath);
+    let resolved = path.resolve(wikiPath);
+    // 如果传入项目根目录（没有 wiki/ 子目录），自动补全为 .nium-wiki
+    if (!fs.existsSync(path.join(resolved, 'wiki'))) {
+      const candidate = path.join(resolved, '.nium-wiki');
+      if (fs.existsSync(path.join(candidate, 'wiki'))) {
+        resolved = candidate;
+      } else {
+        console.error(`❌ .nium-wiki directory not found: ${resolved}`);
+        console.error(`   Make sure you are running from the project root, or pass the path explicitly:`);
+        console.error(`     nium-wiki i18n status ${path.join(resolved, '.nium-wiki')}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
     const statuses = checkSyncStatus(resolved, opts.lang);
     process.exitCode = printSyncStatus(statuses);
   });
@@ -334,8 +381,42 @@ i18nCmd
   .description('Update translation memory cache')
   .argument('[wiki-path]', '.nium-wiki directory path', '.nium-wiki')
   .action((wikiPath: string) => {
-    const resolved = path.resolve(wikiPath);
+    let resolved = path.resolve(wikiPath);
+    if (!fs.existsSync(path.join(resolved, 'wiki'))) {
+      const candidate = path.join(resolved, '.nium-wiki');
+      if (fs.existsSync(path.join(candidate, 'wiki'))) {
+        resolved = candidate;
+      } else {
+        console.error(`❌ .nium-wiki directory not found: ${resolved}`);
+        console.error(`   Make sure you are running from the project root, or pass the path explicitly:`);
+        console.error(`     nium-wiki i18n sync-memory ${path.join(resolved, '.nium-wiki')}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
     syncMemory(resolved);
+  });
+
+i18nCmd
+  .command('init-memory')
+  .description('Initialize translation memory from existing wiki_en/ files')
+  .argument('[wiki-path]', '.nium-wiki directory path', '.nium-wiki')
+  .option('--lang <code>', 'Only initialize specified language')
+  .action((wikiPath: string, opts: { lang?: string }) => {
+    let resolved = path.resolve(wikiPath);
+    if (!fs.existsSync(path.join(resolved, 'wiki'))) {
+      const candidate = path.join(resolved, '.nium-wiki');
+      if (fs.existsSync(path.join(candidate, 'wiki'))) {
+        resolved = candidate;
+      } else {
+        console.error(`❌ .nium-wiki directory not found: ${resolved}`);
+        console.error(`   Make sure you are running from the project root, or pass the path explicitly:`);
+        console.error(`     nium-wiki i18n init-memory ${path.join(resolved, '.nium-wiki')}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+    initMemory(resolved, opts.lang);
   });
 
 program.parse();

@@ -102,19 +102,18 @@ Produce **professional-grade**, domain-organized project Wiki under the `.nium-w
 
 > ⚠️ **HARD REQUIREMENT**: Before generating ANY Mermaid diagram, you MUST read
 > [refs/mermaid-syntax.md](./refs/mermaid-syntax.md) in full. Generating without reading
-> this file is a hard requirement violation and causes **silent render failures**.
+> this file is a hard requirement violation.
 
-**Core principle**: IDs = English alphanumeric | Labels = unquoted | Special chars = HTML entities
+**✅ Hard Rules** — parser errors (must fix). **⚠️ Suggestions** — best practices.
 
-| # | Rule | Wrong ❌ | Correct ✅ |
-|---|------|----------|------------|
-| 1 | Plain labels need no quotes | `A["CLI"]` | `A[CLI]` |
-| 2 | IDs must be `[a-zA-Z0-9_]` only | `Core.1[Core]` | `Core_1[Core]` |
-| 3 | subgraph IDs must be English | `subgraph 核心层[...]` | `subgraph Core[...]` |
-| 4 | subgraph ID must not collide with node ID | `subgraph CLI[...]\nCLI[...]` | `subgraph CL[...]\nCLI[...]` |
-| 5 | Inner quotes use `&quot;` | `A[Config "x" val]` | `A[Config &quot;x&quot; val]` |
-| 6 | sequenceDiagram participants alphanumeric | `participant User.1` | `participant User_1` |
-| 7 | Avoid Mermaid reserved words as IDs | `class[class]` | `NodeClass[class]` |
+| Category | Rule | Wrong ❌ | Correct ✅ |
+|----------|------|----------|------------|
+| ✅ | subgraph ID must not collide with node ID | `subgraph CLI[...]\nCLI[...]` | `subgraph CL[...]\nCLI[...]` |
+| ✅ | Unescaped quotes in plain labels | `A[Config "x" val]` | `A[Config &quot;x&quot; val]` or `A["Config \"x\" val"]` |
+| ✅ | Reserved keywords as IDs | `class[class]` | `NodeClass[class]` (keywords: `class`, `graph`, `digraph`, `subgraph`, `end`, `click`, `style`, `state`, `note`) |
+| ⚠️ | Plain labels preferred for simple text | `A["Label"]` | `A[Label]` |
+| ⚠️ | Alphanumeric IDs preferred | `Core.1[Core]` | `Core_1[Core]` |
+| ⚠️ | English subgraph IDs preferred | `subgraph 核心层[...]` | `subgraph Core[...]` |
 
 **Complexity grouping** (when nodes > 6):
 
@@ -316,7 +315,7 @@ Normalize all paths relative to the project root.
 ### Step 1 — Pre-flight Check
 
 ```bash
-(cd skills/nium-wiki/scripts && node index.js analyze-module <path> [--json])
+node skills/nium-wiki/scripts/index.js analyze-module <path> [--json]
 ```
 
 Read the returned `docScope` and `roleRecommendation`:
@@ -416,7 +415,7 @@ Resume from Step 1 Pre-flight Check, then proceed to generation
 > **Applies when**: InputType = `EXPLORE` — user only wants to understand the code, no documentation generated.
 
 ```bash
-(cd skills/nium-wiki/scripts && node index.js analyze-module <path> [--json])
+node skills/nium-wiki/scripts/index.js analyze-module <path> [--json]
 ```
 
 Output: JSON format structured analysis. Display to user. **Do not write any wiki files.**
@@ -455,18 +454,22 @@ User Input
 ### 1. CLI Commands Quick Reference
 
 ```bash
-(cd skills/nium-wiki/scripts && node index.js init [path] --lang <code>)  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
-(cd skills/nium-wiki/scripts && node index.js analyze [path])           # Analyze project structure
-(cd skills/nium-wiki/scripts && node index.js analyze-module <path> [--batch|--json])  # Analyze module: classify role, recommend template
-(cd skills/nium-wiki/scripts && node index.js incremental [path])      # Run incremental pipeline: diff + deps + doc-index → affected docs
-(cd skills/nium-wiki/scripts && node index.js diff-index [path])        # Detect file changes (--no-update to skip hash write)
-(cd skills/nium-wiki/scripts && node index.js build-index [path])       # Build source ↔ doc mapping index
-(cd skills/nium-wiki/scripts && node index.js build-deps [path])        # Build import/require dependency graph
-(cd skills/nium-wiki/scripts && node index.js audit-docs <dir> [--verbose|--json|--mermaid-strict|--role <role>])  # Check doc quality
-(cd skills/nium-wiki/scripts && node index.js serve [wiki-path])        # Start docsify server
+node skills/nium-wiki/scripts/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de); run from project root
+node skills/nium-wiki/scripts/index.js analyze [path]             # Analyze project structure
+node skills/nium-wiki/scripts/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
+node skills/nium-wiki/scripts/index.js incremental [path]         # Run incremental pipeline: diff → deps → doc-index → affected docs; run from project root
+node skills/nium-wiki/scripts/index.js diff-index [path]          # Detect file changes (--no-update to skip hash write); run from project root
+node skills/nium-wiki/scripts/index.js build-index [path]          # Build source ↔ doc mapping index; run from project root
+node skills/nium-wiki/scripts/index.js build-deps [path]           # Build import/require dependency graph; run from project root
+node skills/nium-wiki/scripts/index.js audit-docs [.nium-wiki] [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
+node skills/nium-wiki/scripts/index.js serve [wiki-path]          # Start docsify server
 ```
 
 For detailed usage, see `node skills/nium-wiki/scripts/index.js --help`
+
+> **⚠️ IMPORTANT**: All commands that take `[path]` (incremental, diff-index, build-index, build-deps, etc.)
+> **must be run from the project root directory**, or pass the absolute/relative path to the project root.
+> The `audit-docs` and `serve` commands take the `.nium-wiki` directory path (default: `.nium-wiki`).
 
 ### 2. Language Detection (MANDATORY)
 
@@ -484,7 +487,7 @@ Before running any CLI commands or generating any documentation:
 ### 3. Initialization Check
 
 Check if `.nium-wiki/` exists:
-- **Not exists**: Run `(cd skills/nium-wiki/scripts && node index.js init --lang <code>)` to create directory structure.
+- **Not exists**: Run `node skills/nium-wiki/scripts/index.js init . --lang <code>` to create directory structure (run from project root).
   Determine `<code>` by examining the project's natural language (README, code comments, docs) and the language the user is communicating in. Use `en` if unclear.
 - **Exists**: Read `config.json` and cache, perform incremental update
 
@@ -504,7 +507,7 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 
 ### 5. Project Analysis (Deep)
 
-Run `(cd skills/nium-wiki/scripts && node index.js analyze [path])` or analyze manually:
+Run `node skills/nium-wiki/scripts/index.js analyze .` or analyze manually:
 
 1. **Identify tech stack**: Check dependency manifests (e.g. package.json, requirements.txt, go.mod, Cargo.toml, pom.xml, etc.)
 2. **Find entry points**: Locate main source files (e.g. src/index.ts, main.py, main.go, main.rs, src/main/java/App.java, etc.)
@@ -534,7 +537,7 @@ Save structure to `cache/structure.json`.
 Use the **automated incremental pipeline** to detect changes and compute the precise list of affected docs in one step:
 
 ```bash
-(cd skills/nium-wiki/scripts && node index.js incremental [--no-commit] [-v])
+node skills/nium-wiki/scripts/index.js incremental . [--no-commit] [-v]  # run from project root
 ```
 
 This runs the full pipeline: `diff-index` → `build-deps` → `build-index` → transitive-impact → doc-dep analysis. It outputs:
@@ -619,10 +622,10 @@ Attach navigable source links next to documented symbols:
 - Sanitize link paths and build indexes **after** wiki files are written:
 
 ```bash
-(cd skills/nium-wiki/scripts && node index.js sanitize-links)
-(cd skills/nium-wiki/scripts && node index.js build-index)
-(cd skills/nium-wiki/scripts && node index.js build-deps)
-(cd skills/nium-wiki/scripts && node index.js diff-index)
+node skills/nium-wiki/scripts/index.js sanitize-links .  # run from project root
+node skills/nium-wiki/scripts/index.js build-index .       # run from project root
+node skills/nium-wiki/scripts/index.js build-deps .       # run from project root
+node skills/nium-wiki/scripts/index.js diff-index .      # run from project root (--no-update to skip hash write)
 ```
 
 > `sanitize-links` scans all wiki `.md` files and converts any `file://` absolute paths to project-root-relative paths. **MUST** run before `build-index`.
@@ -640,7 +643,7 @@ Attach navigable source links next to documented symbols:
 
 #### 12.1 Build Translation Task List
 
-Run `(cd skills/nium-wiki/scripts && node index.js i18n status)` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
+Run `node skills/nium-wiki/scripts/index.js i18n status .nium-wiki` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
 
@@ -666,10 +669,10 @@ After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 
 After ALL files are translated:
 ```bash
-(cd skills/nium-wiki/scripts && node index.js i18n sync-memory)
+node skills/nium-wiki/scripts/index.js i18n sync-memory .nium-wiki
 ```
 
-Run `(cd skills/nium-wiki/scripts && node index.js i18n status)` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
+Run `node skills/nium-wiki/scripts/index.js i18n status .nium-wiki` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
 
 **Delete rule**: When deleting any file from `wiki/` (e.g. because the source file was deleted), you **MUST** also delete the corresponding file from ALL `wiki_{lang}/` directories.
 
@@ -877,7 +880,7 @@ When module count > 10, source files > 50, or LOC > 10,000, switch to batch mode
 1. **Prioritize modules** — entry points (weight 5) > dependents (4) > has docs (3) > code size (2) > recently modified (1)
 2. **Generate 1-2 modules per batch** — depth scales with complexity
 3. **Track progress** in `cache/progress.json` — record completed/pending modules and current batch number
-4. **After each batch** — run `(cd skills/nium-wiki/scripts && node index.js audit-docs .nium-wiki --verbose --mermaid-strict)`, report results to user, then prompt:
+4. **After each batch** — run `node skills/nium-wiki/scripts/index.js audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
    - `"continue"` — next batch
    - `"audit docs"` — re-run validation
    - `"regenerate <module>"` — redo a specific module
@@ -896,7 +899,7 @@ When existing wiki docs are outdated or below quality gate, use one of these str
 | `incremental_upgrade` | Many modules, want to keep existing content | "upgrade wiki" |
 | `targeted_upgrade` | Only specific modules need attention | "upgrade \<module\> docs" |
 
-Execution: scan existing docs with `(cd skills/nium-wiki/scripts && node index.js audit-docs --mermaid-strict)`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
+Execution: scan existing docs with `node skills/nium-wiki/scripts/index.js audit-docs .nium-wiki --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
 
 **Version footer** — append to every generated document:
 `*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/nium-wiki) | {{ GENERATED_AT }}*`

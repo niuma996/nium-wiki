@@ -10,6 +10,169 @@
 (function () {
   'use strict';
 
+  // ── Source code drawer (simple iframe version) ─────────────────────
+
+  /**
+   * Resolve href to a clean path (without hash/query, project-root-relative).
+   */
+  function getSourceFilePath(href) {
+    var cleanHref = href;
+    if (cleanHref.startsWith('#')) cleanHref = cleanHref.substring(1);
+    cleanHref = cleanHref.split('?')[0];
+    var baseUrl = location.href.split('#')[0];
+    try {
+      var resolved = new URL(cleanHref, baseUrl);
+      return resolved.pathname;
+    } catch (_) {
+      return cleanHref;
+    }
+  }
+
+  /**
+   * Check if href is an internal link (not external protocol).
+   */
+  function isInternalHref(href) {
+    if (!href) return false;
+    return !/^(https?|mailto|tel):/.test(href);
+  }
+
+  function openSourceDrawer(filePath) {
+    var drawer = document.getElementById('src-drawer');
+    var iframe = document.getElementById('src-drawer-iframe');
+    var filename = document.getElementById('src-drawer-filename');
+    if (!drawer || !iframe) return;
+
+    filename.textContent = filePath;
+    iframe.src = '/_raw' + filePath;
+    drawer.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSourceDrawer() {
+    var drawer = document.getElementById('src-drawer');
+    var iframe = document.getElementById('src-drawer-iframe');
+    if (drawer) drawer.classList.remove('open');
+    document.body.style.overflow = '';
+    if (iframe) iframe.src = 'about:blank';
+  }
+
+  // Initialize drawer close handlers
+  document.addEventListener('DOMContentLoaded', function () {
+    var closeBtn = document.getElementById('src-drawer-close');
+    var overlay = document.getElementById('src-drawer-overlay');
+    if (closeBtn) closeBtn.addEventListener('click', closeSourceDrawer);
+    if (overlay) overlay.addEventListener('click', closeSourceDrawer);
+
+    // Drawer resize handle (left side, drag to resize width)
+    var handle = document.getElementById('src-drawer-resize-handle');
+    var drawer = document.getElementById('src-drawer');
+    if (handle && drawer) {
+      var minW = window.innerWidth * 0.4; // 下限 40vw
+      var maxW = window.innerWidth * 0.9;  // 上限 90vw
+      var startX = 0, startW = 0;
+      var viewportRight = 0;
+
+      function onMouseMove(e) {
+        var newW = Math.min(maxW, Math.max(minW, viewportRight - e.clientX));
+        drawer.style.width = newW + 'px';
+      }
+
+      function onMouseUp() {
+        drawer.classList.remove('dragging');
+        handle.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      }
+
+      handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        startX = e.clientX;
+        startW = drawer.offsetWidth;
+        viewportRight = window.innerWidth;
+        maxW = viewportRight * 0.9;
+        drawer.classList.add('dragging');
+        handle.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'ew-resize';
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    }
+  });
+
+  // Intercept clicks on source links (capture phase, on document for dynamic content).
+  // Determination is delegated to the server: asks /_is-source whether the file
+  // exists in .nium-wiki/raw/. This makes the drawer work for any project structure
+  // (non-standard layouts, root config files, etc.) without hardcoded patterns.
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href) return;
+    if (!isInternalHref(href)) return;
+
+    // Strip hash so /#/src/foo.ts → /src/foo.ts
+    var cleanHref = href.replace(/^#/, '');
+    var filePath = getSourceFilePath(cleanHref);
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Decide whether to open the drawer based on server response.
+    function decide(open) {
+      if (open) {
+        openSourceDrawer(filePath);
+      } else {
+        // Not a source file — manually restore navigation since we called preventDefault.
+        location.href = href;
+      }
+    }
+
+    // fetch() with navigate:'manual' prevents the browser from navigating while we check.
+    // This keeps the UI responsive (no sync XHR blocking).
+    // Supported in Chrome 102+. For other browsers, we preventDefault and restore
+    // navigation manually after the async fetch resolves.
+    var navOption = typeof Navigation !== 'undefined' ? { navigate: 'manual' } : undefined;
+    fetch('/_is-source?path=' + encodeURIComponent(filePath), {
+      method: 'GET',
+      navigate: navOption,
+    }).then(function (res) {
+      return res.text();
+    }).then(function (body) {
+      decide(body === '1');
+    }).catch(function () {
+      // Network error → treat as non-source, restore navigation
+      decide(false);
+    });
+  }, true);
+
+  // ── Prism fix ───────────────────────────────────────────────────────
+  // docsify 4.x bundles its own Prism in a closure, isolating external
+  // prism-*.min.js language additions (typescript, python, etc.).
+  // Re-highlight all code blocks in the DOM using window.Prism after each render.
+  if (window.$docsify) {
+    window.$docsify.plugins = window.$docsify.plugins || [];
+    window.$docsify.plugins.push(function prismFix(hook) {
+      hook.doneEach(function () {
+        var Prism = window.Prism;
+        if (!Prism || !Prism.languages) return;
+        document.querySelectorAll('pre[data-lang]').forEach(function (pre) {
+          var codeEl = pre.querySelector('code');
+          if (!codeEl) return;
+          var lang = (pre.getAttribute('data-lang') || 'markup').match(/\S*/)[0] || 'markup';
+          var grammar = Prism.languages[lang] || Prism.languages.markup;
+          if (!grammar) return;
+          if (codeEl.querySelector('.token')) return;
+          var text = codeEl.textContent || '';
+          if (text) {
+            codeEl.innerHTML = Prism.highlight(text.replace(/@DOCSIFY_QM@/g, '`'), grammar, lang);
+          }
+        });
+      });
+    });
+  }
+
   // ── Search modal ────────────────────────────────────────────────────
 
   var searchModal, searchInput, searchResults, searchEmpty, searchHint;
@@ -404,7 +567,7 @@
   // ── Keyboard: Escape closes modal ───────────────────────────────────
 
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { closeMermaidModal(); closeSearchModal(); }
+    if (e.key === 'Escape') { closeMermaidModal(); closeSearchModal(); closeSourceDrawer(); }
   });
 
   // ── SSE hot reload ────────────────────────────────────────────────

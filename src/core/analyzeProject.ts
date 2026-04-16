@@ -401,7 +401,7 @@ export async function analyzeProject(
   saveToCache = true,
   importedBy?: Record<string, string[]>,
 ): Promise<ProjectAnalysis> {
-  const excludeDirs = getExcludeDirs(projectRoot);
+  const { dirs: excludeDirs } = getExcludeDirs(projectRoot);
   const projectTypes = await detectProjectTypes(projectRoot);
   const entryPoints = await findEntryPoints(projectRoot, projectTypes, excludeDirs);
   const modules = discoverModules(projectRoot, excludeDirs);

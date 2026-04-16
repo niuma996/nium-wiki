@@ -22,18 +22,19 @@ interface SyncStatus {
   synced: number;
   outdated: number;
   missing: number;
+  uninitialized: number;
   details: SyncDetail[];
 }
 
 interface SyncDetail {
   file: string;
-  status: 'synced' | 'outdated' | 'missing';
+  status: 'synced' | 'outdated' | 'missing' | 'uninitialized';
   sourceHash?: string;
   translatedHash?: string;
 }
 
 interface I18nMemory {
-  entries: Record<string, { hash: string; lang: string; createdAt?: string; updatedAt: string }>;
+  entries: Record<string, { hash: string; lang: string; translatedHash?: string; createdAt?: string; updatedAt: string }>;
 }
 
 // ── 内置 UI 标签表（sidebar / toc 等结构性文本）/ Built-in UI labels (sidebar / toc and other structural text)
@@ -250,6 +251,7 @@ export function checkSyncStatus(wikiPath: string, targetLang?: string): SyncStat
   const config = loadI18nConfig(wikiPath);
   const langs = targetLang ? [targetLang] : (config?.secondaryLangs ?? []);
   const memory = loadMemory(wikiPath);
+  const hasMemory = Object.keys(memory.entries).length > 0;
 
   const sourceDir = path.join(wikiPath, 'wiki');
   if (!fs.existsSync(sourceDir)) return [];
@@ -260,7 +262,7 @@ export function checkSyncStatus(wikiPath: string, targetLang?: string): SyncStat
   for (const lang of langs) {
     const langDir = path.join(wikiPath, `wiki_${lang}`);
     const details: SyncDetail[] = [];
-    let synced = 0, outdated = 0, missing = 0;
+    let synced = 0, outdated = 0, missing = 0, uninitialized = 0;
 
     for (const file of sourceFiles) {
       const srcPath = path.join(sourceDir, file);
@@ -270,6 +272,10 @@ export function checkSyncStatus(wikiPath: string, targetLang?: string): SyncStat
       if (!fs.existsSync(tgtPath)) {
         details.push({ file, status: 'missing', sourceHash: srcHash });
         missing++;
+      } else if (!hasMemory) {
+        // 无记忆时，标记为 uninitialized（记忆未初始化，不代表翻译过期）
+        details.push({ file, status: 'uninitialized', sourceHash: srcHash });
+        uninitialized++;
       } else {
         const memKey = `${lang}:${file}`;
         const memEntry = memory.entries[memKey];
@@ -283,7 +289,7 @@ export function checkSyncStatus(wikiPath: string, targetLang?: string): SyncStat
       }
     }
 
-    results.push({ lang, total: sourceFiles.length, synced, outdated, missing, details });
+    results.push({ lang, total: sourceFiles.length, synced, outdated, missing, uninitialized, details });
   }
 
   return results;
@@ -293,9 +299,14 @@ export function printSyncStatus(statuses: SyncStatus[]): number {
   let hasIssues = false;
   for (const s of statuses) {
     console.log(`\n🌐 Language: ${s.lang}`);
-    console.log(`  Total files: ${s.total} | ✅ Synced: ${s.synced} | ⚠️ Outdated: ${s.outdated} | ❌ Missing: ${s.missing}`);
+    const parts = [`Total files: ${s.total}`];
+    if (s.uninitialized > 0) parts.push(`🔵 Uninitialized: ${s.uninitialized}`);
+    if (s.synced > 0) parts.push(`✅ Synced: ${s.synced}`);
+    if (s.outdated > 0) parts.push(`⚠️ Outdated: ${s.outdated}`);
+    if (s.missing > 0) parts.push(`❌ Missing: ${s.missing}`);
+    console.log(`  ${parts.join(' | ')}`);
 
-    const problems = s.details.filter(d => d.status !== 'synced');
+    const problems = s.details.filter(d => d.status !== 'synced' && d.status !== 'uninitialized');
     if (problems.length > 0) {
       hasIssues = true;
       for (const d of problems) {
@@ -303,6 +314,10 @@ export function printSyncStatus(statuses: SyncStatus[]): number {
         const label = d.status === 'missing' ? 'Missing' : 'Outdated';
         console.log(`  ${icon} [${label}] ${d.file}`);
       }
+    }
+
+    if (s.uninitialized > 0) {
+      console.log(`  💡 Run 'nium-wiki i18n init-memory' to initialize translation memory`);
     }
   }
   return hasIssues ? 1 : 0;
@@ -343,4 +358,49 @@ export function syncMemory(wikiPath: string): void {
 
   saveMemory(wikiPath, memory);
   console.log(`✅ Translation memory updated, ${updated} records total`);
+}
+
+/** 初始化翻译记忆：将当前已存在的翻译文件注册到记忆库（首次使用）/ Initialize translation memory: register existing translation files into the memory cache (for first-time use) */
+export function initMemory(wikiPath: string, targetLang?: string): void {
+  const config = loadI18nConfig(wikiPath);
+  const langs = targetLang ? [targetLang] : (config?.secondaryLangs ?? []);
+  const sourceDir = path.join(wikiPath, 'wiki');
+
+  if (!fs.existsSync(sourceDir)) {
+    console.log('⚠️  wiki/ directory does not exist, skipping');
+    return;
+  }
+
+  const sourceFiles = collectLangFiles(sourceDir);
+  const memory = loadMemory(wikiPath);
+  const now = new Date().toISOString();
+
+  let initialized = 0;
+  for (const lang of langs) {
+    const langDir = path.join(wikiPath, `wiki_${lang}`);
+    for (const file of sourceFiles) {
+      const tgtPath = path.join(langDir, file);
+      if (fs.existsSync(tgtPath)) {
+        const srcHash = fileHash(path.join(sourceDir, file));
+        const translatedHash = fileHash(tgtPath);
+        const memKey = `${lang}:${file}`;
+        memory.entries[memKey] = {
+          hash: srcHash,
+          lang,
+          translatedHash,
+          createdAt: now,
+          updatedAt: now,
+        };
+        initialized++;
+      }
+    }
+  }
+
+  if (initialized === 0) {
+    console.log('⚠️  No translation files found, nothing to initialize');
+    return;
+  }
+
+  saveMemory(wikiPath, memory);
+  console.log(`✅ Translation memory initialized, ${initialized} records created`);
 }

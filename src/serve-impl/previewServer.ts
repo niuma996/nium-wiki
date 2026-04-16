@@ -204,6 +204,176 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
       return;
     }
 
+    // /_is-source?path=<encoded-path> → check if file exists in .nium-wiki/raw/
+    // Returns 200 + "1" if exists, 404 + "0" if not
+    if (urlPath.startsWith('/_is-source')) {
+      const params = new URLSearchParams(query);
+      const filePath = params.get('path') ?? '/';
+      const rawBase = path.join(wikiBasePath, 'raw');
+      const fullPath = path.join(rawBase, decodeURIComponent(filePath));
+      const resolved = path.resolve(fullPath);
+      const resolvedBase = path.resolve(rawBase);
+      if (!resolved.startsWith(resolvedBase)) {
+        res.writeHead(403);
+        res.end('0');
+        return;
+      }
+      const exists = fs.existsSync(resolved);
+      res.writeHead(exists ? 200 : 404);
+      res.end(exists ? '1' : '0');
+      return;
+    }
+
+    // /_raw/* → serve source files from .nium-wiki/raw/ (for source code drawer)
+    if (urlPath.startsWith('/_raw/')) {
+      const rawBase = path.join(wikiBasePath, 'raw');
+      const relPath = urlPath.substring('/_raw'.length);
+      const filePath = path.join(rawBase, relPath);
+      const resolved = path.resolve(filePath);
+      const resolvedBase = path.resolve(rawBase);
+      if (!resolved.startsWith(resolvedBase)) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
+      if (!fs.existsSync(resolved)) {
+        res.writeHead(404);
+        res.end('Not Found');
+        return;
+      }
+      const ext = path.extname(resolved).toLowerCase();
+      const langMap: Record<string, string> = {
+        // JavaScript/TypeScript
+        '.js': 'javascript', '.jsx': 'javascript',
+        '.ts': 'typescript', '.tsx': 'typescript',
+        '.mjs': 'javascript', '.cjs': 'javascript',
+        '.vue': 'markup', '.svelte': 'markup', '.astro': 'markup',
+        // Python
+        '.py': 'python', '.pyi': 'python',
+        // Go / Rust
+        '.go': 'go', '.rs': 'rust',
+        // Java / JVM
+        '.java': 'java', '.kt': 'kotlin', '.scala': 'scala',
+        // Ruby / PHP
+        '.rb': 'ruby', '.php': 'php',
+        // .NET
+        '.cs': 'csharp', '.fs': 'fsharp', '.vb': 'vbnet',
+        // Shell
+        '.sh': 'bash', '.bash': 'bash', '.zsh': 'bash',
+        // Config
+        '.json': 'json',
+        '.yaml': 'yaml', '.yml': 'yaml',
+        '.xml': 'markup', '.toml': 'toml',
+        // Web
+        '.md': 'markdown', '.html': 'markup',
+        '.css': 'css', '.scss': 'css', '.less': 'less',
+        // C/C++
+        '.c': 'c', '.h': 'c', '.cpp': 'cpp', '.hpp': 'cpp',
+      };
+      const lang = langMap[ext] || 'plaintext';
+      fs.readFile(resolved, (err, data) => {
+        if (err) { res.writeHead(500); res.end('Internal Server Error'); return; }
+        const content = data.toString('utf-8');
+        const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const lines = content.split('\n');
+        const lineNumbers = lines.map((_, i) => `<div class="line-num">${i + 1}</div>`).join('');
+        const codeLines = lines.map(line => `<div class="code-line">${esc(line)}</div>`).join('');
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="/_vendor/prismjs/prism.min.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0; background: #fafafa; font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 14px; line-height: 1.8; }
+  .code-wrapper { display: flex; margin: 0; padding: 20px; background: #fafafa; }
+  .line-numbers { flex-shrink: 0; width: 60px; text-align: right; color: #999; user-select: none; border-right: 1px solid #ddd; margin-right: 20px; padding-right: 16px; }
+  .line-num { display: block; min-height: 1.8em; line-height: 1.8; }
+  .code-content { flex: 1; overflow-x: auto; }
+  .code-line { display: block; min-height: 1.8em; line-height: 1.8; white-space: pre; }
+</style>
+</head>
+<body>
+<div class="code-wrapper">
+  <div class="line-numbers">${lineNumbers}</div>
+  <div class="code-content">${codeLines}</div>
+</div>
+<script src="/_vendor/prismjs/prism-core.min.js"></script>
+<script src="/_vendor/prismjs/prism-markup.min.js"></script>
+<script src="/_vendor/prismjs/prism-clike.min.js"></script>
+<script src="/_vendor/prismjs/prism-javascript.min.js"></script>
+<script src="/_vendor/prismjs/prism-typescript.min.js"></script>
+<script src="/_vendor/prismjs/prism-python.min.js"></script>
+<script src="/_vendor/prismjs/prism-json.min.js"></script>
+<script src="/_vendor/prismjs/prism-bash.min.js"></script>
+<script src="/_vendor/prismjs/prism-yaml.min.js"></script>
+<script src="/_vendor/prismjs/prism-go.min.js"></script>
+<script src="/_vendor/prismjs/prism-rust.min.js"></script>
+<script src="/_vendor/prismjs/prism-java.min.js"></script>
+<script src="/_vendor/prismjs/prism-kotlin.min.js"></script>
+<script src="/_vendor/prismjs/prism-scala.min.js"></script>
+<script src="/_vendor/prismjs/prism-ruby.min.js"></script>
+<script src="/_vendor/prismjs/prism-markup-templating.min.js"></script>
+<script src="/_vendor/prismjs/prism-php.min.js"></script>
+<script src="/_vendor/prismjs/prism-php-extras.min.js"></script>
+<script src="/_vendor/prismjs/prism-csharp.min.js"></script>
+<script src="/_vendor/prismjs/prism-fsharp.min.js"></script>
+<script src="/_vendor/prismjs/prism-visual-basic.min.js"></script>
+<script src="/_vendor/prismjs/prism-basic.min.js"></script>
+<script src="/_vendor/prismjs/prism-vbnet.min.js"></script>
+<script src="/_vendor/prismjs/prism-toml.min.js"></script>
+<script src="/_vendor/prismjs/prism-css.min.js"></script>
+<script src="/_vendor/prismjs/prism-less.min.js"></script>
+<script src="/_vendor/prismjs/prism-scss.min.js"></script>
+<script src="/_vendor/prismjs/prism-c.min.js"></script>
+<script src="/_vendor/prismjs/prism-cpp.min.js"></script>
+<script src="/_vendor/prismjs/prism-markdown.min.js"></script>
+<script>
+  (function() {
+    var langMap = {
+      'typescript': Prism.languages.typescript || Prism.languages.clike,
+      'javascript': Prism.languages.javascript || Prism.languages.clike,
+      'python': Prism.languages.python,
+      'bash': Prism.languages.bash,
+      'json': Prism.languages.json,
+      'go': Prism.languages.go,
+      'rust': Prism.languages.rust,
+      'java': Prism.languages.java,
+      'kotlin': Prism.languages.kotlin,
+      'scala': Prism.languages.scala,
+      'ruby': Prism.languages.ruby,
+      'php': Prism.languages.php,
+      'csharp': Prism.languages.csharp,
+      'fsharp': Prism.languages.fsharp,
+      'vbnet': Prism.languages.vbnet,
+      'markup': Prism.languages.markup,
+      'css': Prism.languages.css,
+      'c': Prism.languages.c,
+      'cpp': Prism.languages.cpp,
+      'markdown': Prism.languages.markdown,
+      'yaml': Prism.languages.yaml,
+      'toml': Prism.languages.toml
+    };
+    var lang = '${lang}';
+    var grammar = langMap[lang] || Prism.languages.markup;
+
+    document.querySelectorAll('.code-line').forEach(function(el) {
+      var text = el.textContent || '';
+      if (grammar && text.trim()) {
+        var highlighted = Prism.highlight(text, grammar, lang);
+        el.innerHTML = highlighted;
+      }
+    });
+  })();
+</script>
+</body>
+</html>`;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+        res.end(html);
+      });
+      return;
+    }
+
     // Vendor 静态资源 / Vendor static resources
     if (handleVendorRequest(urlPath, res)) return;
 

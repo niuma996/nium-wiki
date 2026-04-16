@@ -7,7 +7,7 @@
     "nium-wiki": "dist/serve.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.server.json && node scripts/copy-vendor.js",
+    "build": "tsc -p tsconfig.server.json && chmod +x dist/serve.js && node scripts/copy-vendor.js",
     "bundle": "ncc build src/cli.ts -o skills/nium-wiki/scripts --minify && node scripts/inject-version.js && node scripts/post-bundle.js",
     "start": "node dist/serve.js",
     "dev": "ts-node src/cli.ts"
@@ -45,6 +45,7 @@
     "@vercel/ncc": "^0.38.4",
     "docsify": "^4.13.1",
     "docsify-mermaid": "^2.0.1",
+    "ignore": "^7.0.5",
     "mermaid": "^10.9.0",
     "prismjs": "^1.29.0",
     "ts-node": "^10.9.2",

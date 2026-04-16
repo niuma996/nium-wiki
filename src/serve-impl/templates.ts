@@ -55,9 +55,6 @@ function getAppHash(): string {
 }
 const APP_HASH = getAppHash();
 
-/**
- * Generate docsify index.html / 生成 docsify index.html
- */
 export function generateDocsifyIndex(projectName: string, languages?: LangOption[], lang?: string): string {
   const search = lang ? getSearchLabels(lang) : getSearchLabels('en');
   const hasMultiLang = languages && languages.length > 1;
@@ -264,6 +261,19 @@ ${VENDOR_HEAD}
     #search-modal-hint { display: none; padding: 8px 16px; font-size: 11px; color: #bbb; text-align: center; border-top: 1px solid #f0f0f0; }
     /* Hide docsify default search results */
     .search-results { display: none !important; }
+    /* Source code drawer */
+    #src-drawer { display: none; position: fixed; top: 0; right: 0; bottom: 0; z-index: 9990; width: 640px; min-width: 40vw; max-width: 90vw; background: var(--nw-code-bg); box-shadow: -4px 0 24px rgba(0,0,0,0.15); flex-direction: column; font-size: 13px; overflow: hidden; }
+    #src-drawer.open { display: flex; }
+    #src-drawer-overlay { display: none; position: fixed; inset: 0; z-index: 9989; background: rgba(0,0,0,0.3); }
+    #src-drawer.open ~ #src-drawer-overlay { display: block; }
+    #src-drawer-resize-handle { position: absolute; top: 0; left: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 1; background: transparent; transition: background 0.15s; }
+    #src-drawer-resize-handle:hover, #src-drawer-resize-handle.dragging { background: rgba(64,158,255,0.25); }
+    #src-drawer.dragging #src-drawer-resize-handle { width: 24px; }
+    #src-drawer-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #ddd; background: #fff; flex-shrink: 0; }
+    #src-drawer-filename { flex: 1; font-size: 13px; font-weight: 600; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #src-drawer-close { background: none; border: 1px solid #ddd; border-radius: 4px; width: 28px; height: 28px; font-size: 16px; line-height: 26px; text-align: center; cursor: pointer; color: #666; flex-shrink: 0; }
+    #src-drawer-close:hover { background: #f0f0f0; }
+    #src-drawer-iframe { flex: 1; border: none; background: var(--nw-code-bg); }
     ${langSwitcherStyle}
   </style>
 </head>
@@ -286,6 +296,16 @@ ${VENDOR_HEAD}
       <div id="search-modal-hint"></div>
     </div>
   </div>
+  <!-- Source code drawer -->
+  <aside id="src-drawer">
+    <div id="src-drawer-resize-handle"></div>
+    <div id="src-drawer-header">
+      <span id="src-drawer-filename"></span>
+      <button id="src-drawer-close">&#10005;</button>
+    </div>
+    <iframe id="src-drawer-iframe" src="about:blank"></iframe>
+  </aside>
+  <div id="src-drawer-overlay"></div>
   <script>
     window.$docsify = {
       name: '${escapeJs(projectName)}',
@@ -306,7 +326,7 @@ ${VENDOR_HEAD}
       },
       relativePath: true,
     };${langSyncScript}
-  </script>
+  <\/script>
   <script>
     (function() {
       var btn = document.getElementById('scroll-top');
@@ -319,9 +339,9 @@ ${VENDOR_HEAD}
       window.addEventListener('scroll', update, { passive: true });
       update(); // initial check
     })();
-  </script>
-  <script src="/_vendor/app.${APP_HASH}.js"></script>
+  <\/script>
 ${VENDOR_SCRIPTS}
+  <script src="/_vendor/app.${APP_HASH}.js"></script>
 </body>
 </html>
 `;

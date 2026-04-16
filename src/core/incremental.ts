@@ -17,6 +17,7 @@ import * as fs from 'fs';
 import {
   diffSourceIndex,
   updateSourceIndex,
+  syncRawFiles,
   SourceDiff,
 } from './sourceIndex';
 import { loadDocIndex, saveDocIndex, DocIndex } from './buildDocIndex';
@@ -328,9 +329,10 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
     affectedDocs = [...affectedDocMap.values()];
   }
 
-  // Step 7: Commit hashes if requested
+  // Step 7: Commit hashes and sync raw files if requested
   if (commitHashes) {
     updateSourceIndex(projectRoot, sourceDiff.currentHashes);
+    syncRawFiles(projectRoot);
   }
 
   // Build summary

@@ -45,35 +45,75 @@ export interface QualityReport {
   summaryIssues: string[];
 }
 
-function evaluateQualityLevel(m: QualityMetrics): 'basic' | 'standard' | 'professional' {
+/** 评分档位按角色分层 / Score tiers vary by role */
+interface ScoreTiers {
+  sectionThresholds: [number, number]; // [fullScoreVal, halfScoreVal] — 3pts / 2pts thresholds; 1pt = sectionCount >= 1
+  diagramThresholds: [number, number, number]; // 3/2/1 pts thresholds
+  exampleThresholds: [number, number]; // 2/1 pts thresholds
+  crossLinkThresholds: [number, number]; // 2/1 pts thresholds
+}
+
+const SCORE_TIERS: Record<string, ScoreTiers> = {
+  core: {
+    sectionThresholds: [8, 6],       // ≥8 → 3pts, ≥6 → 2pts, ≥5 → 1pt (fixed min)
+    diagramThresholds: [3, 2, 2],    // 3pts≥3, 2pts≥2, 1pt≥2 (must meet minDiagrams=2 to score)
+    exampleThresholds: [3, 1],
+    crossLinkThresholds: [3, 1],
+  },
+  utility: {
+    sectionThresholds: [6, 5],       // ≥6 → 3pts, ≥5 → 2pts (default 5 → 1pt)
+    diagramThresholds: [2, 1, 1],
+    exampleThresholds: [2, 1],
+    crossLinkThresholds: [2, 1],
+  },
+  index: {
+    sectionThresholds: [4, 3],        // ≥4 → 3pts, ≥3 → 2pts (minSections=3, so 3 → 2pts)
+    diagramThresholds: [1, 1, 1],
+    exampleThresholds: [999, 999],   // index 不考核代码示例 — never gives points
+    crossLinkThresholds: [999, 999], // index 不考核交叉链接
+  },
+  default: {
+    sectionThresholds: [7, 5],      // ≥7 → 3pts, ≥5 → 2pts
+    diagramThresholds: [2, 1, 1],
+    exampleThresholds: [3, 1],
+    crossLinkThresholds: [2, 1],
+  },
+};
+
+function evaluateQualityLevel(
+  m: QualityMetrics,
+  role: string,
+): 'basic' | 'standard' | 'professional' {
   let score = 0;
   const totalSections = m.sectionCount + m.subsectionCount;
+  const tiers = SCORE_TIERS[role] ?? SCORE_TIERS['default'];
 
   // ── 结构完整性 / Structural completeness (max 5) ──
+  const [secFull, secHalf] = tiers.sectionThresholds;
   if (m.sectionCount >= 12) score += 3;
-  else if (m.sectionCount >= 8) score += 2;
+  else if (m.sectionCount >= secFull) score += 3;
+  else if (m.sectionCount >= secHalf) score += 2;
   else if (m.sectionCount >= 5) score += 1;
 
   if (totalSections > 0 && m.emptySectionCount / totalSections <= 0.1) score += 1;
-
   if (m.subsectionCount >= 1) score += 1;
 
   // ── 内容丰富度 / Content richness (max 5) ──
-  if (m.diagramCount >= 3) score += 3;
-  else if (m.diagramCount >= 2) score += 2;
-  else if (m.diagramCount >= 1) score += 1;
+  const [diagFull, diagHalf, diagMin] = tiers.diagramThresholds;
+  if (m.diagramCount >= diagFull) score += 3;
+  else if (m.diagramCount >= diagHalf) score += 2;
+  else if (m.diagramCount >= diagMin) score += 1;
 
-  if (m.codeExampleCount >= 3) score += 2;
-  else if (m.codeExampleCount >= 1) score += 1;
+  const [exFull, exMin] = tiers.exampleThresholds;
+  if (m.codeExampleCount >= exFull) score += 2;
+  else if (m.codeExampleCount >= exMin) score += 1;
 
   // ── 链接与追溯 / Links and traceability (max 4) ──
-  if (m.crossLinkCount >= 3) score += 2;
-  else if (m.crossLinkCount >= 1) score += 1;
+  const [clFull, clMin] = tiers.crossLinkThresholds;
+  if (m.crossLinkCount >= clFull) score += 2;
+  else if (m.crossLinkCount >= clMin) score += 1;
 
   if (m.hasSourceTracing) score += 2;
-
-  // ── 行数门槛 / Line count threshold (max 1) ──
-  if (m.lineCount >= 50) score += 1;
 
   if (score >= 12) return 'professional';
   if (score >= 7) return 'standard';
@@ -111,8 +151,8 @@ function calculateExpectedMetrics(filePath: string, role?: string): ExpectedMetr
 
   // 显式 role 优先（CLI --role 参数覆盖一切推断）
   if (role === 'core') {
-    expected.minLines = 200;
-    expected.minSections = 8;
+    expected.minLines = 150;
+    expected.minSections = 6;
     expected.minDiagrams = 2;
     expected.minExamples = 3;
   } else if (role === 'utility') {
@@ -123,7 +163,7 @@ function calculateExpectedMetrics(filePath: string, role?: string): ExpectedMetr
   } else if (role === 'index') {
     expected.minLines = 50;
     expected.minSections = 3;
-    expected.minDiagrams = 1;
+    expected.minDiagrams = 0;
     expected.minExamples = 0;
   } else {
     // 退化：文件名关键词检测（原有逻辑）
@@ -138,8 +178,8 @@ function calculateExpectedMetrics(filePath: string, role?: string): ExpectedMetr
     const isIndex = ['index', '_index', 'toc', 'doc-map'].includes(fileName);
 
     if (isCore) {
-      expected.minLines = 200;
-      expected.minSections = 8;
+      expected.minLines = 150;
+      expected.minSections = 6;
       expected.minDiagrams = 2;
       expected.minExamples = 3;
     } else if (isUtil) {
@@ -150,7 +190,7 @@ function calculateExpectedMetrics(filePath: string, role?: string): ExpectedMetr
     } else if (isIndex) {
       expected.minLines = 50;
       expected.minSections = 3;
-      expected.minDiagrams = 1;
+      expected.minDiagrams = 0;
       expected.minExamples = 0;
     }
   }
@@ -200,12 +240,12 @@ function generateIssues(
   if (!m.hasSourceTracing && expected.minLines >= 150) {
     issues.push('Missing source tracing (Section sources)');
   }
-  if (expected.minSections >= 8) {
+  if (expected.minSections >= 6) {
     if (!m.hasBestPractices) issues.push('Core module missing "Best Practices" section');
     if (!m.hasPerformance) issues.push('Core module missing "Performance Optimization" section');
     if (!m.hasTroubleshooting) issues.push('Core module missing "Error Handling" section');
   }
-  if (m.crossLinkCount < 1) {
+  if (role !== 'index' && m.crossLinkCount < 1) {
     issues.push('Missing cross-links to related documents');
   }
   for (const title of emptyTitles) {
@@ -218,45 +258,6 @@ function generateIssues(
 /**
  * Extract all mermaid blocks from markdown content with their line numbers.
  */
-/**
- * Collect all subgraph container IDs in a diagram.
- */
-function collectSubgraphIds(lines: string[]): Set<string> {
-  const ids = new Set<string>();
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('%%')) continue;
-    const m = trimmed.match(/^subgraph\s+([A-Za-z0-9_]+)\[/);
-    if (m) ids.add(m[1]);
-  }
-  return ids;
-}
-
-/**
- * Check if a line (by index) is inside a subgraph whose container ID matches `id`.
- * Uses indentation as a proxy: a line is inside a subgraph when a prior "subgraph ID[...]" line
- * is at a lower indentation level and no "end" has closed it since.
- */
-function isInsideSubgraph(lines: string[], lineIdx: number, id: string): boolean {
-  let depth = 0;
-  for (let i = 0; i <= lineIdx; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed.startsWith('%%')) continue;
-    if (/^subgraph\s+[A-Za-z0-9_]+\[/.test(trimmed)) {
-      depth++;
-    }
-    if (trimmed === 'end') {
-      depth = Math.max(0, depth - 1);
-    }
-    // Check if this subgraph's ID matches our id
-    const m = trimmed.match(/^subgraph\s+([A-Za-z0-9_]+)\[/);
-    if (m && m[1] === id && i < lineIdx && depth > 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function extractMermaidBlocks(
   lines: string[],
 ): Array<{ line: number; body: string }> {
@@ -280,7 +281,8 @@ function extractMermaidBlocks(
 
 /**
  * Validate Mermaid syntax in a single diagram body.
- * Returns an array of issues found.
+ * Only checks rules that cause actual Mermaid parser errors or render failures.
+ * Removed overly strict rules (non-ASCII IDs, quoted labels) that Mermaid officially supports.
  */
 function validateMermaidDiagram(
   body: string,
@@ -289,91 +291,50 @@ function validateMermaidDiagram(
   const issues: MermaidIssue[] = [];
   const diagramLines = body.split('\n');
 
-  // 1. Collect all node IDs (from `ID[...]`, `ID(...)`, `ID["..."]`, `ID("...")`)
-  const nodeIdSet = new Set<string>();
+  // 1. Collect all IDs and detect conflicts
+  // Mermaid uses a shared namespace for all IDs
+  const allIds = new Map<string, { line: number; type: 'node' | 'subgraph' }>();
   const nodeIdRegex = /^([A-Za-z0-9_]+)\[/;
-  for (const line of diagramLines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('%%')) continue;
-    const match = trimmed.match(nodeIdRegex);
-    if (match) {
-      nodeIdSet.add(match[1]);
-    }
-  }
+  const subgraphIdRegex = /^subgraph\s+([A-Za-z0-9_]+)\[/;
 
-  // 2. Check subgraph IDs for non-alphanumeric characters and invalid quoted-label format
-  const subgraphNonAscii = /^subgraph\s+([^[\s"\-]+)\[/;
-  const subgraphQuotedLabel = /^subgraph\s+([A-Za-z0-9_]+)\["[^"]+"\](?:\s*\[|$)/;
   for (let i = 0; i < diagramLines.length; i++) {
     const line = diagramLines[i].trim();
     if (line.startsWith('%%')) continue;
-    if (!line.startsWith('subgraph')) continue;
 
-    const m = line.match(subgraphNonAscii);
-    if (m) {
-      const id = m[1];
-      if (!/^[A-Za-z0-9_]+$/.test(id)) {
-        issues.push({
-          severity: 'warn',
-          line: baseLine + i,
-          message: `subgraph ID "${id}" contains non-alphanumeric characters — may be unstable`,
-          suggestion: `Use an English alphanumeric ID, e.g. "subgraph ${id.replace(/[^A-Za-z0-9_]/g, '_')}[...]"`,
-        });
-      }
-    }
-
-    const qm = line.match(subgraphQuotedLabel);
-    if (qm) {
-      issues.push({
-        severity: 'error',
-        line: baseLine + i,
-        message: `subgraph declaration uses invalid format: subgraph ${qm[1]}["label"][] — double brackets`,
-        suggestion: `Use "subgraph ${qm[1]} [label]" instead (space between ID and label, no extra brackets)`,
-      });
-    }
-  }
-
-  // 3. Check for subgraph ID collision with node IDs
-  for (let i = 0; i < diagramLines.length; i++) {
-    const line = diagramLines[i].trim();
-    if (line.startsWith('subgraph')) {
-      // subgraph ID is the first token after "subgraph" and before "["
-      const m = line.match(/^subgraph\s+([A-Za-z0-9_]+)\[/);
-      if (m) {
-        const sgId = m[1];
-        if (nodeIdSet.has(sgId)) {
-          issues.push({
-            severity: 'error',
-            line: baseLine + i,
-            message: `subgraph ID "${sgId}" duplicates a node ID in the same diagram — causes render error`,
-            suggestion: `Rename the subgraph ID, e.g. "subgraph ${sgId}_sub[...]" and update inter-subgraph edges`,
-          });
-        }
-      }
-    }
-  }
-
-  // 4. Check for non-ASCII characters in node IDs
-  const nodeIdNonAscii =
-    /^([A-Za-z0-9_]+)\[/;
-  for (let i = 0; i < diagramLines.length; i++) {
-    const line = diagramLines[i].trim();
-    if (line.startsWith('%%')) continue;
-    const m = line.match(nodeIdNonAscii);
-    if (m) {
-      const id = m[1];
-      if (/[^A-Za-z0-9_]/.test(id)) {
+    // Collect node IDs: A[...], A("..."), A["..."]
+    const nodeMatch = line.match(nodeIdRegex);
+    if (nodeMatch) {
+      const id = nodeMatch[1];
+      if (allIds.has(id)) {
+        const existing = allIds.get(id)!;
         issues.push({
           severity: 'error',
           line: baseLine + i,
-          message: `Node ID "${id}" contains non-alphanumeric characters`,
-          suggestion: `Replace with alphanumeric only, e.g. "${id.replace(/[^A-Za-z0-9_]/g, '_')}"`,
+          message: `Node ID "${id}" duplicates ${existing.type} ID at line ${existing.line} — causes render error`,
+          suggestion: `Rename to avoid conflict, e.g. "${id}_node[...]"`,
         });
       }
+      allIds.set(id, { line: baseLine + i, type: 'node' });
+    }
+
+    // Collect subgraph container IDs: subgraph ID[...]
+    const subgraphMatch = line.match(subgraphIdRegex);
+    if (subgraphMatch) {
+      const id = subgraphMatch[1];
+      if (allIds.has(id)) {
+        const existing = allIds.get(id)!;
+        issues.push({
+          severity: 'error',
+          line: baseLine + i,
+          message: `subgraph ID "${id}" duplicates ${existing.type} ID at line ${existing.line} — causes render error`,
+          suggestion: `Rename to avoid conflict, e.g. "subgraph ${id}_sub[...]"`,
+        });
+      }
+      allIds.set(id, { line: baseLine + i, type: 'subgraph' });
     }
   }
 
-  // 5. Reserved keywords as bare IDs
+  // 3. Reserved keywords as bare IDs (causes Mermaid parser errors)
   const reserved = [
     'class',
     'graph',
@@ -395,44 +356,37 @@ function validateMermaidDiagram(
         issues.push({
           severity: 'error',
           line: baseLine + i,
-          message: `ID "${kw}" is a Mermaid reserved keyword`,
+          message: `ID "${kw}" is a Mermaid reserved keyword — causes parser error`,
           suggestion: `Rename to avoid the conflict, e.g. "NodeClass${kw}"`,
         });
       }
     }
   }
 
-  // 6. ID["text"] is never valid as a label in Mermaid (quotes only work for tooltips)
-  //    Mermaid supports:  A[plain]   A["tooltip"]   A["tooltip","label"]
-  //    Mermaid does NOT support: A["Label Text"]
-  const invalidQuotedLabel = /^\s*([A-Za-z0-9_]+)\["[^"]+"\]\s*$/;
+  // 4. Unescaped quotes inside node labels (causes Mermaid parser errors)
+  // Pattern: A[text "with" quotes] without escaping
+  // Mermaid requires: A[text &quot;with&quot; quotes] or use quoted labels A["text with quotes"]
   for (let i = 0; i < diagramLines.length; i++) {
     const line = diagramLines[i].trim();
     if (line.startsWith('%%')) continue;
-    const m = line.match(invalidQuotedLabel);
-    if (m) {
-      const nodeId = m[1];
-      const label = m[2] ?? line.match(/"([^"]+)"/)?.[1] ?? '';
-      // Determine if inside a subgraph with a matching container ID
-      const subgraphIds = collectSubgraphIds(diagramLines);
-      const inMatchingSubgraph = isInsideSubgraph(diagramLines, i, nodeId);
-      const isSubgraphCollision = inMatchingSubgraph && subgraphIds.has(nodeId);
 
-      if (isSubgraphCollision) {
-        issues.push({
-          severity: 'error',
-          line: baseLine + i,
-          message: `Node "${nodeId}["${label}"]" — the quoted format is invalid as a label AND "${nodeId}" is already the container ID of its parent subgraph`,
-          suggestion: `Use "${nodeId}_node[${label}]" instead (rename to avoid ID collision, remove quotes for the label)`,
-        });
-      } else {
-        issues.push({
-          severity: 'error',
-          line: baseLine + i,
-          message: `Node "${nodeId}["${label}"]" uses quoted label format — Mermaid does not support quoted labels (quotes are only valid for tooltips)`,
-          suggestion: `Use "${nodeId}[${label}]" (remove quotes for plain labels) or "${nodeId}["${label}","${label}"]" (if you need a tooltip)`,
-        });
-      }
+    // Match unescaped quotes in plain labels:
+    // - ID[text "with" quotes] - plain label with unescaped quotes (ERROR)
+    // - ID["text"] - quoted label (VALID, do not match)
+    // - ID["tooltip","label"] - tooltip with label (VALID, do not match)
+    const plainLabelWithQuotes = /^\s*([A-Za-z0-9_]+)\[([^"\[]*\"[^"\[]*)+\]/;
+    const quotedLabel = /^\s*([A-Za-z0-9_]+)\["[^"\]]+"\](?:\s*,|\s*\[|$)/;
+
+    if (quotedLabel.test(line)) continue; // Skip valid quoted labels
+
+    const m = line.match(plainLabelWithQuotes);
+    if (m) {
+      issues.push({
+        severity: 'error',
+        line: baseLine + i,
+        message: `Unescaped quote in plain label: ${m[0].substring(0, 40)}...`,
+        suggestion: `Use quoted labels: A["label with \"quotes\""] or escape: A[label &quot;with&quot; quotes]`,
+      });
     }
   }
 
@@ -525,7 +479,8 @@ export function analyzeDocument(
   metrics.hasPerformance = labels.performance.some(k => lower.includes(k.toLowerCase()));
   metrics.hasTroubleshooting = labels.troubleshooting.some(k => lower.includes(k.toLowerCase()));
 
-  metrics.qualityLevel = evaluateQualityLevel(metrics);
+  const role = explicitRole ?? (wikiDir ? inferRoleFromWikiPath(wikiDir, filePath) : 'auto');
+  metrics.qualityLevel = evaluateQualityLevel(metrics, role);
   metrics.issues = generateIssues(metrics, emptyTitles, wikiDir, explicitRole);
 
   return metrics;

@@ -6,8 +6,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { execSync } from 'child_process';
-import { updateSourceIndex, diffSourceIndex } from '../core/sourceIndex';
+import { updateSourceIndex, diffSourceIndex, syncRawFiles } from '../core/sourceIndex';
 import { CONFIG_EXCLUDE_LIST } from '../utils/patterns';
 import { languageHandlerManager } from '../language-handlers/index';
 
@@ -15,6 +16,7 @@ interface NiumWikiConfig {
   language: string;
   exclude: string[];
   useGitignore: boolean;
+  syncRaw: boolean;
 }
 
 function getDefaultConfig(primaryLang: string): NiumWikiConfig {
@@ -22,6 +24,7 @@ function getDefaultConfig(primaryLang: string): NiumWikiConfig {
     language: primaryLang,
     exclude: [...CONFIG_EXCLUDE_LIST],
     useGitignore: true,
+    syncRaw: true,
   };
 }
 
@@ -45,15 +48,127 @@ function getGitBranch(cwd: string): string {
   }
 }
 
+export interface DirtyFile {
+  path: string;
+  hash: string;
+}
+
+export interface SourceInfo {
+  branch: string;
+  baseCommit: string;
+  baseCommitTime: string;
+  baseCommitMessage: string;
+  dirty: boolean;
+  dirtyFiles: DirtyFile[];
+}
+
+/** 收集工作区中所有未提交的已跟踪文件及其 SHA256（前 16 位）/ Collect all uncommitted tracked files in the working tree with their SHA256 (first 16 chars). Returns null when git is unavailable. */
+function getDirtyFiles(projectRoot: string): DirtyFile[] | null {
+  try {
+    const status = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf-8' });
+    const lines = String(status).trim().split('\n').filter(Boolean);
+    const dirtyFiles: DirtyFile[] = [];
+
+    for (const line of lines) {
+      // git status --porcelain 格式: XY path（X=staged, Y=worktree）
+      const staged = line[0];
+      const worktree = line[1];
+      // 只关注工作区改动（M）和新增未跟踪文件（??），忽略仅暂存的改动
+      if (worktree === 'M' || worktree === '?' || (staged !== ' ' && staged !== '?' && worktree === 'M')) {
+        const filePath = line.slice(3).trim();
+        if (!filePath) continue;
+        try {
+          // 跳过子模块和二进制文件
+          const content = fs.readFileSync(filePath, 'utf-8');
+          const hash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+          dirtyFiles.push({ path: filePath, hash });
+        } catch { /* skip unreadable files */ }
+      }
+    }
+    return dirtyFiles;
+  } catch {
+    // 无 git 时，返回 null，由调用方决定是否需要扫描全量文件
+    return null;
+  }
+}
+
+/** 扫描目录下的所有源文件（无 git 回退方案）/ Scan all source files in a directory (git-less fallback) */
+function scanAllSourceFiles(projectRoot: string, extensions: string[] = ['.ts', '.js', '.py', '.go', '.java', '.rs']): DirtyFile[] {
+  const dirtyFiles: DirtyFile[] = [];
+
+  function walk(dir: string): void {
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          // 跳过常见无关目录
+          if (!['node_modules', '.git', 'dist', 'build', 'target', '__pycache__', 'vendor'].includes(entry.name)) {
+            walk(fullPath);
+          }
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name);
+          if (extensions.includes(ext)) {
+            try {
+              const content = fs.readFileSync(fullPath, 'utf-8');
+              const hash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+              const relativePath = path.relative(projectRoot, fullPath);
+              dirtyFiles.push({ path: relativePath, hash });
+            } catch { /* skip unreadable files */ }
+          }
+        }
+      }
+    } catch { /* skip inaccessible directories */ }
+  }
+
+  walk(projectRoot);
+  return dirtyFiles;
+}
+
+/** 获取当前 git 状态信息（branch、commit、未提交文件列表）/ Get current git state info (branch, commit, dirty file list) */
+export function getSourceInfo(projectRoot: string): SourceInfo {
+  const branch = getGitBranch(projectRoot);
+  let baseCommit = '';
+  let baseCommitTime = '';
+  let baseCommitMessage = '';
+
+  try {
+    baseCommit = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf-8' }).trim();
+    baseCommitTime = execSync('git log -1 --format=%ci', { cwd: projectRoot, encoding: 'utf-8' }).trim();
+    baseCommitMessage = execSync('git log -1 --format=%s', { cwd: projectRoot, encoding: 'utf-8' }).trim();
+  } catch {
+    baseCommit = 'unknown';
+    baseCommitTime = new Date().toISOString();
+    baseCommitMessage = 'unknown';
+  }
+
+  // 有 git → 用 git status 检测工作区改动；无 git → 扫描全量源文件
+  let dirtyFiles = getDirtyFiles(projectRoot);
+  if (dirtyFiles === null) {
+    // git 不可用，回退到扫描全量文件
+    dirtyFiles = scanAllSourceFiles(projectRoot);
+  }
+
+  return {
+    branch,
+    baseCommit,
+    baseCommitTime,
+    baseCommitMessage,
+    dirty: dirtyFiles.length > 0,
+    dirtyFiles,
+  };
+}
+
 async function getDefaultMeta(projectRoot: string): Promise<Record<string, unknown>> {
   const now = new Date().toISOString();
   const languageIds = languageHandlerManager.detectProjectLanguages(projectRoot);
   const projectVersion = await languageHandlerManager.detectProjectVersionForLanguages(languageIds, projectRoot);
+  const source = getSourceInfo(projectRoot);
   return {
     project: path.basename(projectRoot),
-    branch: getGitBranch(projectRoot),
     createdAt: now,
     updatedAt: now,
+    source,
     ...(projectVersion ? { version: projectVersion } : {}),
   };
 }
@@ -114,6 +229,7 @@ export async function initNiumWiki(projectRoot: string, force = false, primaryLa
     '.nium-wiki',
     '.nium-wiki/cache',
     '.nium-wiki/wiki',
+    '.nium-wiki/raw',
   ];
 
   for (const dirPath of directories) {
@@ -160,6 +276,9 @@ export async function initNiumWiki(projectRoot: string, force = false, primaryLa
   // 扫描项目文件并写入初始哈希基线 / Scan project files and write initial hash baseline
   const changes = diffSourceIndex(projectRoot);
   updateSourceIndex(projectRoot, changes.currentHashes);
+
+  // 同步源文件到 .nium-wiki/raw/（受 config.json syncRaw 控制）/ Sync source files to .nium-wiki/raw/ (controlled by config.json syncRaw)
+  syncRawFiles(projectRoot);
 
   result.message = `Successfully initialized .nium-wiki directory, created ${result.created.length} files/directories`;
   return result;

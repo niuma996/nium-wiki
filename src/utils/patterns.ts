@@ -5,13 +5,17 @@
  * 排除目录和代码扩展名从语言处理器动态派生，
  * avoiding hardcoded language-specific content
  * 避免硬编码语言特定内容
+ *
+ * Gitignore pattern matching is delegated to the `ignore` package (full gitignore semantics),
+ * gitignore 模式匹配委托给 `ignore` 包（完整 gitignore 语义）。
  */
 
 import * as path from 'path';
+import { Ignore } from 'ignore';
 import { languageHandlerManager } from '../language-handlers/index';
 
 // ─── Exclusion Directories ─────────────────────────────────────────────
-// ─── 排除目录 ───────────────────────────────────────────────
+// ─── 排除目录 ─────────────────────────────────────────────
 
 /** Common exclusion directories (language-agnostic) / 通用排除目录（与语言无关） */
 const COMMON_EXCLUDE_DIRS = [
@@ -34,7 +38,7 @@ export const DEFAULT_EXCLUDE_DIRS = new Set([
 ]);
 
 // ─── Ignore Files ─────────────────────────────────────────────────────────
-// ─── 忽略文件 ───────────────────────────────────────────────
+// ─── 忽略文件 ─────────────────────────────────────────────
 
 /** Specific file names that should be skipped / 应跳过的特定文件名 */
 export const IGNORE_FILES = new Set([
@@ -56,6 +60,9 @@ export const CODE_EXTENSIONS = new Set([
 /** Document file extensions / 文档文件扩展名 */
 export const DOC_EXTENSIONS = new Set(['.md', '.mdx', '.rst', '.txt']);
 
+/** Config file extensions / 配置文件扩展名 */
+export const CONFIG_EXTENSIONS = new Set(['.json', '.yaml', '.yml', '.toml', '.xml', '.ini', '.cfg', '.conf']);
+
 // ─── Exclusion List for config.json Template ──────────────────────────────
 // ─── config.json 模板用的排除列表 ────────────────────────────
 
@@ -66,19 +73,64 @@ export const CONFIG_EXCLUDE_LIST = [
 ];
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
-// ─── 工具函数 ───────────────────────────────────────────────
+// ─── 工具函数 ─────────────────────────────────────────────
 
-/** Check if path contains directories that should be excluded / 判断路径中是否包含应排除的目录 */
-export function isExcludedPath(filePath: string, excludes?: Set<string>): boolean {
+/**
+ * Check if a path segment matches a wildcard directory pattern from config/excludes.
+ * Supports suffix wildcard (e.g. "dir*") and prefix wildcard (*"dir") against a single path segment.
+ *
+ * @param part - single path segment, e.g. "dist", "node_modules"
+ * @param pattern - a simple wildcard pattern without '/', e.g. "dir*"
+ */
+function matchesWildcardDir(part: string, pattern: string): boolean {
+  if (pattern.startsWith('*')) {
+    return part.endsWith(pattern.substring(1));
+  }
+  if (pattern.endsWith('*')) {
+    return part.startsWith(pattern.slice(0, -1));
+  }
+  return false;
+}
+
+/**
+ * Check if path contains directories that should be excluded.
+ * Uses two layers:
+ *  1. Exact match against simple directory names (fast, in hot path)
+ *  2. ignore instance for full gitignore glob semantics (*, **, !, etc.)
+ *
+ * @param filePath  - relative path, e.g. ".gitnexus/wiki/docs.md"
+ * @param excludes  - Set of simple directory names (for fast exact-match)
+ * @param ig       - optional ignore instance (from createIgnore); if omitted,
+ *                   falls back to DEFAULT_EXCLUDE_DIRS and no glob support
+ */
+export function isExcludedPath(
+  filePath: string,
+  excludes?: Set<string>,
+  ig?: Ignore,
+): boolean {
   const dirs = excludes ?? DEFAULT_EXCLUDE_DIRS;
   const parts = filePath.split(/[\\/]/);
+
+  // Layer 1: fast exact directory-name match
   for (const part of parts) {
     if (dirs.has(part)) return true;
-    // Support wildcard patterns, e.g. *.log / 支持通配符模式，如 *.log
-    for (const pattern of dirs) {
-      if (pattern.startsWith('*') && part.endsWith(pattern.substring(1))) return true;
+  }
+
+  // Layer 2: wildcard directory patterns from excludes set (prefix/suffix *)
+  for (const pattern of dirs) {
+    if (pattern.includes('*')) {
+      for (const part of parts) {
+        if (matchesWildcardDir(part, pattern)) return true;
+      }
     }
   }
+
+  // Layer 3: full gitignore semantics via ignore package
+  if (ig) {
+    // ignore.filter returns [] (empty = ignored) or [path] (kept)
+    if (ig.filter([filePath]).length === 0) return true;
+  }
+
   return false;
 }
 
@@ -92,8 +144,24 @@ export function isDocFile(filePath: string): boolean {
   return DOC_EXTENSIONS.has(path.extname(filePath));
 }
 
-/** Check if file should be included in scanning (code or document, and not in excluded paths) / 判断文件是否应被纳入扫描（代码或文档，且不在排除路径中） */
-export function shouldIncludeFile(filePath: string, excludes?: Set<string>): boolean {
-  if (isExcludedPath(filePath, excludes)) return false;
-  return isCodeFile(filePath) || isDocFile(filePath);
+/** Check if file is a config file / 判断是否为配置文件 */
+export function isConfigFile(filePath: string): boolean {
+  return CONFIG_EXTENSIONS.has(path.extname(filePath));
+}
+
+/**
+ * Check if file should be included in scanning (code or document, and not in excluded paths).
+ * Pass the ignore instance (from createIgnore) for full gitignore pattern support.
+ *
+ * @param filePath - relative path
+ * @param excludes - Set of directory names
+ * @param ig       - optional ignore instance
+ */
+export function shouldIncludeFile(
+  filePath: string,
+  excludes?: Set<string>,
+  ig?: Ignore,
+): boolean {
+  if (isExcludedPath(filePath, excludes, ig)) return false;
+  return isCodeFile(filePath) || isDocFile(filePath) || isConfigFile(filePath);
 }

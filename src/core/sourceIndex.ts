@@ -7,9 +7,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { shouldIncludeFile } from '../utils/patterns';
-import { getExcludeDirs } from '../utils/config';
+import { getExcludeDirs, loadConfig } from '../utils/config';
 import { walkFiles } from '../utils/fileWalker';
 import { loadCache, saveCache } from '../utils/cache';
+import type { Ignore } from 'ignore';
 
 function calculateFileHash(filePath: string): string {
   try {
@@ -21,12 +22,16 @@ function calculateFileHash(filePath: string): string {
   }
 }
 
-function scanProjectFiles(projectRoot: string, excludes: Set<string>): Record<string, string> {
+function scanProjectFiles(
+  projectRoot: string,
+  excludeDirs: Set<string>,
+  ig: Ignore,
+): Record<string, string> {
   const hashes: Record<string, string> = {};
-  const files = walkFiles(projectRoot, { excludeDirs: excludes, relative: true });
+  const files = walkFiles(projectRoot, { excludeDirs, relative: true });
 
   for (const relPath of files) {
-    if (shouldIncludeFile(relPath, excludes)) {
+    if (shouldIncludeFile(relPath, excludeDirs, ig)) {
       hashes[relPath] = calculateFileHash(path.join(projectRoot, relPath));
     }
   }
@@ -60,8 +65,8 @@ export interface SourceDiff {
 
 export function diffSourceIndex(projectRoot: string): SourceDiff {
   const wikiDir = path.join(projectRoot, '.nium-wiki');
-  const excludes = getExcludeDirs(projectRoot);
-  const currentHashes = scanProjectFiles(projectRoot, excludes);
+  const { dirs: excludeDirs, ig } = getExcludeDirs(projectRoot);
+  const currentHashes = scanProjectFiles(projectRoot, excludeDirs, ig);
   const cached = loadSourceIndex(wikiDir);
   const cachedHashes: Record<string, string> = {};
   for (const [k, v] of Object.entries(cached)) {
@@ -165,4 +170,89 @@ export function printSourceDiff(diff: SourceDiff): void {
       console.log(`  ... and ${diff.deleted.length - 10} more files`);
     }
   }
+}
+
+const RAW_DIR = '.nium-wiki/raw';
+
+/**
+ * Sync scanned source files to .nium-wiki/raw/, preserving directory structure.
+ * Only copies files that are new or have changed hash, and removes raw copies
+ * of files that no longer exist in the scan result.
+ *
+ * Skipped entirely when syncRaw is false in config.json.
+ */
+export function syncRawFiles(projectRoot: string): void {
+  const config = loadConfig(projectRoot);
+  if (!config.syncRaw) return;
+
+  const wikiDir = path.join(projectRoot, '.nium-wiki');
+  const rawDir = path.join(projectRoot, RAW_DIR);
+
+  // Ensure raw/ exists — init may have skipped subdirectory creation on re-init
+  if (!fs.existsSync(rawDir)) {
+    fs.mkdirSync(rawDir, { recursive: true });
+  }
+
+  const { dirs: excludeDirs, ig } = getExcludeDirs(projectRoot);
+
+  // Scan current source files — same logic as scanProjectFiles
+  const currentFiles = walkFiles(projectRoot, { excludeDirs, relative: true });
+  const toKeep = new Set<string>();
+  const now = new Date().toISOString();
+
+  for (const relPath of currentFiles) {
+    if (!shouldIncludeFile(relPath, excludeDirs, ig)) continue;
+    toKeep.add(relPath);
+
+    const srcPath = path.join(projectRoot, relPath);
+    const dstPath = path.join(rawDir, relPath);
+
+    // Copy if new or hash changed
+    const hash = calculateFileHash(srcPath);
+    const cacheKey = relPath.replace(/[/\\]/g, '_');
+    const hashCachePath = path.join(wikiDir, 'cache', `raw_hash_${cacheKey}.json`);
+
+    let lastHash = '';
+    try {
+      if (fs.existsSync(hashCachePath)) {
+        lastHash = JSON.parse(fs.readFileSync(hashCachePath, 'utf-8')).hash ?? '';
+      }
+    } catch { /* ignore */ }
+
+    if (hash !== lastHash) {
+      const dstDir = path.dirname(dstPath);
+      if (!fs.existsSync(dstDir)) {
+        fs.mkdirSync(dstDir, { recursive: true });
+      }
+      fs.copyFileSync(srcPath, dstPath);
+      fs.writeFileSync(hashCachePath, JSON.stringify({ hash, updatedAt: now }, null, 2), 'utf-8');
+    }
+  }
+
+  // Remove raw copies of deleted files
+  function removeDeleted(dir: string, prefix: string): void {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        removeDeleted(path.join(dir, entry.name), rel);
+        // Remove empty directories
+        const remaining = fs.readdirSync(path.join(dir, entry.name));
+        if (remaining.length === 0) {
+          fs.rmdirSync(path.join(dir, entry.name));
+        }
+      } else {
+        const cacheKey = rel.replace(/[/\\]/g, '_');
+        const hashCachePath = path.join(wikiDir, 'cache', `raw_hash_${cacheKey}.json`);
+        if (!toKeep.has(rel)) {
+          try {
+            if (fs.existsSync(hashCachePath)) fs.unlinkSync(hashCachePath);
+            fs.unlinkSync(path.join(dir, entry.name));
+          } catch { /* ignore */ }
+        }
+      }
+    }
+  }
+
+  removeDeleted(rawDir, '');
 }

@@ -21,7 +21,11 @@ export const VENDOR_SCRIPTS = `  <!-- docsify core -->
   <script src="/_vendor/docsify/docsify.min.js"></script>
   <!-- search plugin -->
   <script src="/_vendor/docsify/search.min.js"></script>
-  <!-- code highlight -->
+  <!-- code highlight: prism-core must load before language files -->
+  <script src="/_vendor/prismjs/prism-core.min.js"></script>
+  <script src="/_vendor/prismjs/prism-markup.min.js"></script>
+  <script src="/_vendor/prismjs/prism-clike.min.js"></script>
+  <script src="/_vendor/prismjs/prism-javascript.min.js"></script>
   <script src="/_vendor/prismjs/prism-typescript.min.js"></script>
   <script src="/_vendor/prismjs/prism-python.min.js"></script>
   <script src="/_vendor/prismjs/prism-bash.min.js"></script>
@@ -30,6 +34,24 @@ export const VENDOR_SCRIPTS = `  <!-- docsify core -->
   <script src="/_vendor/prismjs/prism-go.min.js"></script>
   <script src="/_vendor/prismjs/prism-rust.min.js"></script>
   <script src="/_vendor/prismjs/prism-java.min.js"></script>
+  <script src="/_vendor/prismjs/prism-kotlin.min.js"></script>
+  <script src="/_vendor/prismjs/prism-scala.min.js"></script>
+  <script src="/_vendor/prismjs/prism-ruby.min.js"></script>
+  <script src="/_vendor/prismjs/prism-markup-templating.min.js"></script>
+  <script src="/_vendor/prismjs/prism-php.min.js"></script>
+  <script src="/_vendor/prismjs/prism-php-extras.min.js"></script>
+  <script src="/_vendor/prismjs/prism-csharp.min.js"></script>
+  <script src="/_vendor/prismjs/prism-fsharp.min.js"></script>
+  <script src="/_vendor/prismjs/prism-visual-basic.min.js"></script>
+  <script src="/_vendor/prismjs/prism-basic.min.js"></script>
+  <script src="/_vendor/prismjs/prism-vbnet.min.js"></script>
+  <script src="/_vendor/prismjs/prism-toml.min.js"></script>
+  <script src="/_vendor/prismjs/prism-css.min.js"></script>
+  <script src="/_vendor/prismjs/prism-less.min.js"></script>
+  <script src="/_vendor/prismjs/prism-scss.min.js"></script>
+  <script src="/_vendor/prismjs/prism-c.min.js"></script>
+  <script src="/_vendor/prismjs/prism-cpp.min.js"></script>
+  <script src="/_vendor/prismjs/prism-markdown.min.js"></script>
   <!-- mermaid -->
   <script src="/_vendor/mermaid/mermaid.min.js"></script>
   <script src="/_vendor/docsify-mermaid/docsify-mermaid.js"></script>

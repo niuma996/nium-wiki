@@ -2,7 +2,7 @@
 
 > **Audience**: Claude (used in code generation context).
 > This is the authoritative reference for Mermaid diagram rules enforced by Nium-Wiki.
-> Skipping these rules causes **silent render failures** (blank or broken diagrams).
+> Rules marked as ⚠️ are suggestions for best practices, not hard requirements.
 
 ## 1. Diagram Complexity Optimization
 
@@ -48,47 +48,66 @@ flowchart TD
 
 ## 2. Syntax Safety Rules (Mermaid v10.9+ Compatible)
 
-### Node Labels — No Quotes Needed for Plain Labels
+### ⚠️ Node Labels — Two Formats Supported
 
-Mermaid's `ID[label]` format does **not** use quotes around plain labels. Quotes are only valid for tooltips via the two-argument form `ID["tooltip","label"]`.
+Mermaid supports two label formats:
+- **Plain labels**: `A[Label Text]` — no quotes needed
+- **Quoted labels**: `A["Label Text"]` — quotes for Unicode and special characters
+
+Both formats are **officially supported**. Use whichever is more readable.
 
 ```mermaid
-%% WRONG — quoted plain label triggers audit-docs rule 6
-%% A["CLI Entry"]
-
-%% CORRECT — plain unquoted labels
+%% CORRECT — plain label (simple text)
 flowchart TD
-    A[CLI Entry] --> B[Source Index]
+    A[Start] --> B[Process]
+
+%% CORRECT — quoted label (Unicode or special chars)
+flowchart TD
+    A["Start ↑"] --> B["处理中 →"]
 ```
 
-### Node IDs — Alphanumeric Only
+### ⚠️ Node IDs — Alphanumeric is Recommended but Not Required
 
-Use only `[a-zA-Z0-9_]` in node IDs. Non-ASCII characters in IDs cause compatibility issues.
+Mermaid supports Unicode node IDs. However, **alphanumeric IDs are recommended** for:
+- Better compatibility with older Mermaid versions
+- Easier to reference in edges and styles
 
 ```mermaid
-%% WRONG — non-alphanumeric ID (dot and Chinese characters are not allowed)
-CoreModule_123[Core Module]
+%% RECOMMENDED — alphanumeric IDs
+flowchart TD
+    CoreModule_123[Core Module]
 
-%% CORRECT — alphanumeric only (underscore is allowed)
-CoreModule_123[Core Module]
-CoreModule[Core Module]
+%% ALSO VALID — Unicode IDs work in Mermaid v10+
+flowchart TD
+    核心模块[Core Module]
 ```
 
-### subgraph IDs — English Only
-
-subgraph IDs must be English alphanumeric. Non-ASCII subgraph IDs produce unstable rendering across Mermaid versions.
+### ⚠️ Subgraph IDs — Alphanumeric is Recommended but Not Required
 
 ```mermaid
-%% WRONG — non-ASCII subgraph ID
-subgraph 核心层[Core Layer]
-
-%% CORRECT — English alphanumeric subgraph ID
+%% RECOMMENDED — English alphanumeric IDs
 subgraph CoreLayer[Core Layer]
+
+%% ALSO VALID — Unicode IDs work in Mermaid v10+
+subgraph 核心层[Core Layer]
 ```
 
-### subgraph ID vs Node ID — Shared Namespace
+### ⚠️ sequenceDiagram Participants — Alphanumeric is Recommended
 
-subgraph IDs and node IDs share a **single namespace**. A subgraph ID must **not** duplicate any node ID in the same diagram.
+```mermaid
+%% RECOMMENDED — alphanumeric participant IDs
+sequenceDiagram
+    participant User_123
+    participant Server as ServerBackend
+
+%% ALSO VALID — dots work but may cause issues in some contexts
+sequenceDiagram
+    participant User.123
+```
+
+### ✅ subgraph ID vs Node ID — Shared Namespace (HARD RULE)
+
+subgraph IDs and node IDs share a **single namespace**. A subgraph ID must **not** duplicate any node ID in the same diagram — this causes render errors.
 
 ```mermaid
 %% WRONG — subgraph ID "CLI" collides with node ID "CLI"
@@ -107,36 +126,27 @@ flowchart TB
     CL --> A
 ```
 
-### Labels with Special Characters — Escape Inner Quotes with HTML Entities
+### ✅ Labels with Special Characters — Escape Inner Quotes (HARD RULE)
 
-When a label itself contains a double-quote character, escape it with `&quot;`.
+When a **plain label** (without quotes) contains a double-quote character, escape it with `&quot;`.
 
 ```mermaid
-%% WRONG — unescaped quotes inside label
+%% WRONG — unescaped quote in plain label (causes parser error)
 flowchart TD
     A[Config "key" value]
 
-%% CORRECT — escaped inner quotes
+%% CORRECT — escaped inner quote in plain label
 flowchart TD
     A[Config &quot;key&quot; value]
+
+%% CORRECT — use quoted label instead
+flowchart TD
+    A["Config \"key\" value"]
 ```
 
-### sequenceDiagram Participants — Alphanumeric IDs
+### ✅ Reserved Keywords — Avoid as Bare IDs (HARD RULE)
 
-Participant IDs in `sequenceDiagram` must be alphanumeric.
-
-```mermaid
-%% WRONG — non-alphanumeric participant ID (dot is not allowed)
-participant User.123
-
-%% CORRECT — alphanumeric only (underscore is allowed)
-participant User_123
-participant User as User123
-```
-
-### Reserved Keywords — Avoid as IDs
-
-Mermaid has reserved words (`class`, `graph`, `digraph`, `subgraph`, `end`, `click`, `style`, etc.) that must not be used bare as IDs.
+Mermaid has reserved words that cause parser errors when used as bare IDs.
 
 ```mermaid
 %% WRONG — "class" is a reserved word
@@ -148,16 +158,21 @@ flowchart TD
     NodeClass[class]
 ```
 
-## 3. One-Line Principle
+Reserved keywords: `class`, `graph`, `digraph`, `subgraph`, `end`, `click`, `style`, `state`, `note`
 
-> **IDs: English alphanumeric | Labels: unquoted | Special chars: HTML entities**
+## 3. Summary
+
+| Rule Type | Examples | Enforcement |
+|-----------|----------|-------------|
+| **⚠️ Suggestions** | Quoted labels, Unicode IDs | Warn only (not required) |
+| **✅ Hard Rules** | ID collision, reserved keywords, unescaped quotes | Error (blocks generation) |
 
 ## 4. Layout Direction
 
 Choose the chart direction by content type:
 
 | Direction | Use When |
-|-----------|---------|
+|-----------|----------|
 | `TB` (Top→Bottom) | Hierarchies, inheritance, call trees |
 | `LR` (Left→Right) | Flows, dependencies, pipelines |
 | `BT` (Bottom→Top) | Reversed hierarchies (rare) |

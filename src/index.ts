@@ -53,10 +53,12 @@ export {
   IGNORE_FILES,
   CODE_EXTENSIONS,
   DOC_EXTENSIONS,
+  CONFIG_EXTENSIONS,
   CONFIG_EXCLUDE_LIST,
   isExcludedPath,
   isCodeFile,
   isDocFile,
+  isConfigFile,
   shouldIncludeFile,
 } from './utils/patterns';
 

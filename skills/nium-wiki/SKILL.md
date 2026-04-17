@@ -156,10 +156,31 @@ flowchart TD
 
 ### 🔴 MANDATORY: Source Attribution for Code Block Excerpts
 
-Any code block that is a direct excerpt from a source file (function body, class definition, type definition, import/export statement) MUST carry a source attribution comment immediately above the block. This applies to `.ts`, `.js`, `.py`, `.go`, `.rs`, `.java`, and other language source files.
+Any code block that is a direct excerpt from a source file (function body, class definition, type definition, import/export statement) MUST carry a source attribution line immediately **above** the code block. This applies to `.ts`, `.js`, `.py`, `.go`, `.rs`, `.java`, and other language source files.
+
+> **⚠️ CRITICAL**: The attribution line MUST be placed **outside** the code fence (above the opening ```), using plain text format **without any language-specific comment syntax** (no `//`, `#`, `/* */`, etc.). The attribution line is plain text, and the Markdown link inside it will be rendered as a clickable link.
+
+**✅ CORRECT format**:
 
 ```markdown
+[Source: cli.ts](/src/cli.ts#L42-L67)
+```typescript
+const result = cli.parse(process.argv);
+```
+```
+
+**❌ WRONG formats (links will NOT be clickable)**:
+
+```markdown
+// Wrong: Inside the code block as a comment — the link won't work
+```typescript
 // Source: [cli.ts](/src/cli.ts#L42-L67)
+const result = cli.parse(process.argv);
+```
+
+```markdown
+// Wrong: Uses comment syntax (//, #, etc.) — renders as code, not text
+// [Source: cli.ts](/src/cli.ts#L42-L67)
 ```typescript
 const result = cli.parse(process.argv);
 ```
@@ -173,8 +194,6 @@ Attribution is **not required** for:
 | Teaching / invented examples | Any code that does not exist in the source | Not in any source file |
 | Mermaid / shell / CLI commands | `flowchart TD\n  A --> B` | Not source code |
 | Output / runtime results | `// Output: { id: 1 }` | Results, not source |
-
-The attribution comment is a markdown HTML comment (`<!-- -->`) so it does not render in the output wiki. It is a metadata signal for readers and for the `build-index` pipeline.
 
 ### 🔴 MANDATORY: Complexity-Scaled Quality Targets
 
@@ -276,7 +295,7 @@ Every code example must:
 |---|---|
 | core doc ≥ 5 code examples | Add **0–1 example** only when a new API is introduced by the changed source |
 | ≥ 2 distinct diagram types | **Do NOT regenerate any diagram** — preserve existing diagrams unchanged |
-| Full 11-section `module.md` template | **Patch only the affected section(s)** listed in `triggeredBy` |
+| Full 11-section `module.md` template | **Patch only the affected section(s)** based on which source files are listed in `triggeredBy` |
 | `flowchart LR` for type/module relationships | **Skip** unless the class was modified **and** its source was read |
 | API summary must cover all exports | **Only cover exports that changed** |
 | core doc ≥ 400 lines | **No minimum** — a 50-line targeted patch is preferable to a 400-line rewrite |
@@ -363,7 +382,6 @@ Display a structured report and **await user confirmation before proceeding**:
 
 ### Key Findings
 - Exports: N functions, M types
-- LOC: ~X (estimated)
 - Dependents: N modules depend on this
 
 ### Recommended Sections
@@ -410,25 +428,13 @@ Resume from Step 1 Pre-flight Check, then proceed to generation
 
 ---
 
-## Explore Mode
-
-> **Applies when**: InputType = `EXPLORE` — user only wants to understand the code, no documentation generated.
-
-```bash
-node skills/nium-wiki/scripts/index.js analyze-module <path> [--json]
-```
-
-Output: JSON format structured analysis. Display to user. **Do not write any wiki files.**
-
----
-
 ## Full Decision Tree
 
 ```
 User Input
   │
   ├─ "generate wiki" (no module specified)
-  │    └─ FULL pipeline → Section 1–12
+  │    └─ FULL pipeline → Section 1–11
   │
   ├─ "generate wiki for <module>"
   │    ├─ .nium-wiki does not exist → init → MODULE_TARGETED
@@ -441,7 +447,7 @@ User Input
   │    └─ MODULE_TARGETED + force full regeneration
   │
   ├─ "analyze module X"
-  │    └─ EXPLORE mode → JSON output, no file writes
+  │    └─ Run `node skills/nium-wiki/scripts/index.js analyze-module <path> --json` — JSON signals only, no wiki files written
   │
   └─ "refresh / upgrade wiki" (no module)
        └─ MAINTENANCE → audit → regenerate failing docs
@@ -483,13 +489,6 @@ Before running any CLI commands or generating any documentation:
 
 > **Rule**: The `language` field in `config.json` is the **only authoritative source** for documentation language.
 > Do NOT infer language from source code comments, README, file names, or conversation context.
-
-### 3. Initialization Check
-
-Check if `.nium-wiki/` exists:
-- **Not exists**: Run `node skills/nium-wiki/scripts/index.js init . --lang <code>` to create directory structure (run from project root).
-  Determine `<code>` by examining the project's natural language (README, code comments, docs) and the language the user is communicating in. Use `en` if unclear.
-- **Exists**: Read `config.json` and cache, perform incremental update
 
 ### 4. Language Configuration
 
@@ -550,7 +549,7 @@ This runs the full pipeline: `diff-index` → `build-deps` → `build-index` →
 
 > **IMPORTANT**: Always run `incremental` before generating, not `diff-index` alone.
 > `diff-index` only detects source changes — it does NOT map them to wiki docs.
-> After `incremental` completes, always check i18n sync status (Step 8 "After saving, sync secondary languages") before declaring the update done.
+> After `incremental` completes, always check i18n sync status (see **Step 12**) before declaring the update done.
 
 ### 8. Target Docs (resolved by the pipeline above)
 
@@ -561,7 +560,7 @@ The `incremental` command in Step 5 already resolves this. Each affected doc inc
 
 Manual fallback (if pipeline not available): Read `.nium-wiki/cache/doc-index.json` → `sourceToDoc` field. If a changed source file has no entry, infer by naming convention: `src/fooBar.ts` → `modules/foo-bar.md`, and nested paths: `src/core/analyzeProject.ts` → `modules/core/analyze-project.md`.
 
-### 9. Content Generation (Enterprise Quality)
+### 9. Content Generation
 
 > **🔴 MANDATORY: Language from config.json**
 >
@@ -574,7 +573,7 @@ Manual fallback (if pipeline not available): Read `.nium-wiki/cache/doc-index.js
 
 Generate content adhering to the **quality gate** defined above:
 
-#### 10.1 Template Selection Rules
+#### 9.1 Template Selection Rules
 
 Not all templates are needed for every project. Apply these rules:
 
@@ -587,31 +586,32 @@ Not all templates are needed for every project. Apply these rules:
 | `api.md` | project exports programmatic APIs (functions/classes/types) |
 | `doc-map.md` | module count >= 5 |
 
-#### 10.2 Homepage (`index.md`)
+#### 9.2 Homepage (`index.md`)
 **Template**: Read `templates/index.md` for full structure.
 
-#### 10.3 Architecture Doc (`architecture.md`)
+#### 9.3 Architecture Doc (`architecture.md`)
 **Template**: Read `templates/architecture.md` for full structure.
 
-#### 10.4 Module Docs (`modules/<name>.md`)
+#### 9.4 Module Docs (`modules/<name>.md`)
 **Templates**: Read `templates/module.md` (core) or `templates/module-simple.md` (util/config/helper/test).
 - **Key rule**: Detailed API signatures and type definitions belong exclusively in api.md. Module docs only contain an API overview table with a link.
 
-#### 10.5 API Docs (`api/<name>.md`)
+#### 9.5 API Docs (`api/<name>.md`)
 **Template**: Read `templates/api.md` for full structure.
 - Single source of truth for all API signatures and type definitions.
 - Mark `@deprecated` APIs with migration guidance (what to use instead).
 - Include parameter constraints where applicable (e.g. "must not be empty", "range 0-100").
 
-#### 10.6 Getting Started (`getting-started.md`)
+#### 9.6 Getting Started (`getting-started.md`)
 **Template**: Read `templates/getting-started.md` for full structure.
 
-#### 10.7 Doc Map (`doc-map.md`)
+#### 9.7 Doc Map (`doc-map.md`)
 **Template**: Read `templates/doc-map.md` for full structure.
 
-### 10. Source Code Links
+#### 9.8 Source Links
 
 Attach navigable source links next to documented symbols:
+
 ```markdown
 ### `functionName` [📄](/src/file.ts#L42)
 ```
@@ -696,7 +696,7 @@ Run `node skills/nium-wiki/scripts/index.js i18n status .nium-wiki` again to ver
 
 | `updateStrength` | Meaning | Action |
 |-----------------|---------|--------|
-| `full` | Source directly changed (function body, signature, etc.) | Regenerate this doc fully, apply quality gate |
+| `full` | Function signature changed OR module role changed | Full regeneration of this doc |
 | `incremental` | Transitive/dep/doc-dep propagation | **Surgical patch only** — no quality gate, no template |
 
 > **Rule**: If the pipeline says `updateStrength: incremental` for a doc, treat it as a targeted
@@ -720,7 +720,7 @@ Cross-read the existing doc against the changed source files. Answer:
 
 | Match degree | Signals | Action |
 |---|---|---|
-| **≥ 80%** | Internal change only (comment, variable rename, refactor); function signatures unchanged; core topics not touched | Update version footer only — do not touch the body |
+| **≥ 80%** | Internal change only (comment, variable rename, refactor); function signatures unchanged; core topics not touched | **Default: PRESERVE** — update version footer only, do not touch the body. If no version footer exists, create one (a single line). |
 | **40–80%** | One function's behavior changed; new export added; file structure changed | Patch only the affected sections — leave everything else untouched |
 | **< 40%** | Function renamed or signature changed; module role changed; multiple sections invalidated | Full regeneration of this document |
 
@@ -771,6 +771,22 @@ Change type → Minimum doc impact
    → Do NOT restructure the entire section
 ```
 
+#### Decision Checklist — What Changed vs What to Update
+
+Before editing, run through this checklist to determine the minimum scope:
+
+- [ ] **Function signature changed?** (params, return type, or name)
+    → Update API summary table row + add new signature to examples
+
+- [ ] **Function behavior changed in a user-visible way?** (callers must change how they use it)
+    → Update that function's description paragraph + examples
+
+    - [ ] Behavior change only affects internal call chains, not external callers?
+        → Update version footer only — do NOT rewrite descriptions or examples
+
+- [ ] **Only internal implementation changed?** (helper functions, variable names, refactor)
+    → Update version footer only — do NOT rewrite descriptions or examples
+
 ### Principle 3 — Match Degree Evaluation Guide
 
 When evaluating match degree, use these concrete signals:
@@ -804,10 +820,16 @@ Rule:
 
 If the description is merely "not ideal" but still correct, leave it alone. A smaller diff is always better than a prettier paragraph.
 
+> **🔴 PRESERVE is the default for ≥ 80% match.**
+> The burden of proof is on rewriting, not on preserving.
+> You MUST actively justify any deviation. A 1-line footer update is always preferable to a full rewrite.
+
 ### Anti-Patterns (What Not to Do)
 
 | Anti-pattern | Why it's wrong |
 |---|---|
+| Rewrite doc because "source file changed" without asking: what exactly changed? | Large diff, zero factual improvement |
+| Full regeneration when function signature is unchanged | Internal implementation change ≠ doc invalidation |
 | Regenerate full file from template | Creates massive diff for no reason |
 | Rewrite all code examples | Even correct examples get rephrased |
 | Reorder sections | Changes the diff noise, no factual benefit |

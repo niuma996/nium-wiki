@@ -34,7 +34,7 @@ export function generateSidebarMd(wikiDir: string, lang?: string): string {
   const labels = getTocLabels(resolvedLang);
   const lines: string[] = [];
 
-  // 顶层固定文档（按优先级排列）
+  // Fixed top-level docs (ordered by priority) / 顶层固定文档（按优先级排列）
   const topDocs: Array<[string, keyof TocLabels]> = [
     ['index.md', 'home'],
     ['architecture.md', 'architecture'],
@@ -51,7 +51,7 @@ export function generateSidebarMd(wikiDir: string, lang?: string): string {
     }
   }
 
-  // 收集子目录和剩余的顶层 .md 文件
+  // Collect subdirs and remaining top-level .md files / 收集子目录和剩余的顶层 .md 文件
   const topLevelMdHandled = new Set(topDocs.map(d => d[0]));
   topLevelMdHandled.add('_sidebar.md');
   topLevelMdHandled.add('_navbar.md');
@@ -60,7 +60,7 @@ export function generateSidebarMd(wikiDir: string, lang?: string): string {
   try {
     const entries = fs.readdirSync(wikiDir, { withFileTypes: true });
 
-    // 剩余顶层 .md 文件
+    // Remaining top-level .md files / 剩余顶层 .md 文件
     const extraMds = entries
       .filter(e => e.isFile() && e.name.endsWith('.md') && !topLevelMdHandled.has(e.name) && !e.name.startsWith('_'))
       .map(e => e.name)
@@ -71,7 +71,7 @@ export function generateSidebarMd(wikiDir: string, lang?: string): string {
       lines.push(`- [${title}](/${md})`);
     }
 
-    // 子目录
+    // Subdirectories / 子目录
     const dirs = entries
       .filter(e => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'assets')
       .map(e => e.name)
@@ -111,14 +111,14 @@ function buildSidebarRecursive(dirPath: string, relDir: string, lines: string[],
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
-    // _index.md 作为目录概述
+    // _index.md as directory overview / _index.md 作为目录概述
     const indexPath = path.join(dirPath, '_index.md');
     if (fs.existsSync(indexPath)) {
       const title = extractTitle(indexPath, labels);
       lines.push(`${indent}- [${title}](/${relDir}/_index.md)`);
     }
 
-    // .md 文件（排除 _index.md）
+    // .md files (excluding _index.md) / .md 文件（排除 _index.md）
     const mdFiles = entries
       .filter(e => e.isFile() && e.name.endsWith('.md') && e.name !== '_index.md' && !e.name.startsWith('_'))
       .map(e => e.name)
@@ -129,7 +129,7 @@ function buildSidebarRecursive(dirPath: string, relDir: string, lines: string[],
       lines.push(`${indent}- [${title}](/${relDir}/${md})`);
     }
 
-    // 子目录
+    // Subdirectories (recursive) / 子目录（递归）
     const subDirs = entries
       .filter(e => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'assets')
       .map(e => e.name)

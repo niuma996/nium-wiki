@@ -46,7 +46,7 @@ export function generateToc(wikiDir: string, baseUrl = '/', lang?: string): stri
   const labels = getTocLabels(resolvedLang);
   const tocLines = [`# ${labels.toc}\n`];
 
-  // 主要文档
+  // Main docs / 主要文档
   const mainDocs: Array<[string, keyof typeof labels]> = [
     ['index.md', 'home'],
     ['getting-started.md', 'gettingStarted'],
@@ -64,7 +64,7 @@ export function generateToc(wikiDir: string, baseUrl = '/', lang?: string): stri
 
   tocLines.push('');
 
-  // 模块文档
+  // Module docs / 模块文档
   const modulesDir = path.join(wikiPath, 'modules');
   if (fs.existsSync(modulesDir)) {
     tocLines.push(`## ${labels.modules}\n`);
@@ -77,7 +77,7 @@ export function generateToc(wikiDir: string, baseUrl = '/', lang?: string): stri
     tocLines.push('');
   }
 
-  // API 文档
+  // API docs / API 文档
   const apiDir = path.join(wikiPath, 'api');
   if (fs.existsSync(apiDir)) {
     tocLines.push(`## ${labels.api}\n`);
@@ -90,7 +90,7 @@ export function generateToc(wikiDir: string, baseUrl = '/', lang?: string): stri
     tocLines.push('');
   }
 
-  // 指南文档
+  // Guides / 指南文档
   const guidesDir = path.join(wikiPath, 'guides');
   if (fs.existsSync(guidesDir)) {
     tocLines.push(`## ${labels.guides}\n`);
@@ -101,7 +101,7 @@ export function generateToc(wikiDir: string, baseUrl = '/', lang?: string): stri
     tocLines.push('');
   }
 
-  // 设计文档
+  // Design docs / 设计文档
   const designDir = path.join(wikiPath, 'design');
   if (fs.existsSync(designDir)) {
     tocLines.push(`## ${labels.design}\n`);

@@ -181,24 +181,32 @@ const RAW_DIR = '.nium-wiki/raw';
  *
  * Skipped entirely when syncRaw is false in config.json.
  */
-export function syncRawFiles(projectRoot: string): void {
+/**
+ * Sync scanned source files to .nium-wiki/raw/, preserving directory structure.
+ * Only copies files that are new or have changed hash, and removes raw copies
+ * of files that no longer exist in the scan result.
+ *
+ * Skipped entirely when syncRaw is false in config.json.
+ *
+ * @param projectRoot    - Project root directory
+ * @param currentHashes  - Current file hashes (from diffSourceIndex result)
+ */
+export function syncRawFiles(
+  projectRoot: string,
+  currentHashes: Record<string, string>,
+): void {
   const config = loadConfig(projectRoot);
   if (!config.syncRaw) return;
 
-  const wikiDir = path.join(projectRoot, '.nium-wiki');
   const rawDir = path.join(projectRoot, RAW_DIR);
 
-  // Ensure raw/ exists — init may have skipped subdirectory creation on re-init
   if (!fs.existsSync(rawDir)) {
     fs.mkdirSync(rawDir, { recursive: true });
   }
 
   const { dirs: excludeDirs, ig } = getExcludeDirs(projectRoot);
-
-  // Scan current source files — same logic as scanProjectFiles
   const currentFiles = walkFiles(projectRoot, { excludeDirs, relative: true });
   const toKeep = new Set<string>();
-  const now = new Date().toISOString();
 
   for (const relPath of currentFiles) {
     if (!shouldIncludeFile(relPath, excludeDirs, ig)) continue;
@@ -206,50 +214,46 @@ export function syncRawFiles(projectRoot: string): void {
 
     const srcPath = path.join(projectRoot, relPath);
     const dstPath = path.join(rawDir, relPath);
-
-    // Copy if new or hash changed
-    const hash = calculateFileHash(srcPath);
-    const cacheKey = relPath.replace(/[/\\]/g, '_');
-    const hashCachePath = path.join(wikiDir, 'cache', `raw_hash_${cacheKey}.json`);
-
-    let lastHash = '';
-    try {
-      if (fs.existsSync(hashCachePath)) {
-        lastHash = JSON.parse(fs.readFileSync(hashCachePath, 'utf-8')).hash ?? '';
+    const hash = currentHashes[relPath];
+    // Compare against raw file's actual content (source-index.json may be pre-filled
+    // in init scenarios where updateSourceIndex runs before syncRawFiles).
+    const rawExists = fs.existsSync(dstPath);
+    let needsCopy = false;
+    if (hash) {
+      if (!rawExists) {
+        needsCopy = true;
+      } else {
+        const rawHash = calculateFileHash(dstPath);
+        if (hash !== rawHash) needsCopy = true;
       }
-    } catch { /* ignore */ }
-
-    if (hash !== lastHash) {
+    }
+    if (needsCopy) {
       const dstDir = path.dirname(dstPath);
       if (!fs.existsSync(dstDir)) {
         fs.mkdirSync(dstDir, { recursive: true });
       }
       fs.copyFileSync(srcPath, dstPath);
-      fs.writeFileSync(hashCachePath, JSON.stringify({ hash, updatedAt: now }, null, 2), 'utf-8');
     }
   }
 
-  // Remove raw copies of deleted files
+  // Remove raw copies of deleted files (no longer need to clean up raw_hash_*.json)
   function removeDeleted(dir: string, prefix: string): void {
     if (!fs.existsSync(dir)) return;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        removeDeleted(path.join(dir, entry.name), rel);
-        // Remove empty directories
-        const remaining = fs.readdirSync(path.join(dir, entry.name));
-        if (remaining.length === 0) {
-          fs.rmdirSync(path.join(dir, entry.name));
+        const subDir = path.join(dir, entry.name);
+        removeDeleted(subDir, rel);
+        if (fs.existsSync(subDir)) {
+          const children = fs.readdirSync(subDir);
+          if (children.length === 0) {
+            fs.rmdirSync(subDir);
+          }
         }
-      } else {
-        const cacheKey = rel.replace(/[/\\]/g, '_');
-        const hashCachePath = path.join(wikiDir, 'cache', `raw_hash_${cacheKey}.json`);
-        if (!toKeep.has(rel)) {
-          try {
-            if (fs.existsSync(hashCachePath)) fs.unlinkSync(hashCachePath);
-            fs.unlinkSync(path.join(dir, entry.name));
-          } catch { /* ignore */ }
-        }
+      } else if (!toKeep.has(rel)) {
+        try {
+          fs.unlinkSync(path.join(dir, entry.name));
+        } catch { /* ignore */ }
       }
     }
   }

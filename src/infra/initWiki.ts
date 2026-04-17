@@ -70,14 +70,16 @@ function getDirtyFiles(projectRoot: string): DirtyFile[] | null {
     const dirtyFiles: DirtyFile[] = [];
 
     for (const line of lines) {
-      // git status --porcelain 格式: XY path（X=staged, Y=worktree）
+      // git status --porcelain format: XY path (X=staged, Y=worktree)
       const staged = line[0];
       const worktree = line[1];
+      // Only track worktree changes (M) and new untracked files (??); ignore staged-only changes
       // 只关注工作区改动（M）和新增未跟踪文件（??），忽略仅暂存的改动
       if (worktree === 'M' || worktree === '?' || (staged !== ' ' && staged !== '?' && worktree === 'M')) {
         const filePath = line.slice(3).trim();
         if (!filePath) continue;
         try {
+          // Skip submodules and binary files
           // 跳过子模块和二进制文件
           const content = fs.readFileSync(filePath, 'utf-8');
           const hash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
@@ -87,6 +89,7 @@ function getDirtyFiles(projectRoot: string): DirtyFile[] | null {
     }
     return dirtyFiles;
   } catch {
+    // No git → return null, let caller decide whether to scan all files
     // 无 git 时，返回 null，由调用方决定是否需要扫描全量文件
     return null;
   }
@@ -102,6 +105,7 @@ function scanAllSourceFiles(projectRoot: string, extensions: string[] = ['.ts', 
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
+          // Skip common irrelevant directories
           // 跳过常见无关目录
           if (!['node_modules', '.git', 'dist', 'build', 'target', '__pycache__', 'vendor'].includes(entry.name)) {
             walk(fullPath);
@@ -143,8 +147,10 @@ export function getSourceInfo(projectRoot: string): SourceInfo {
   }
 
   // 有 git → 用 git status 检测工作区改动；无 git → 扫描全量源文件
+  // Has git → use git status; no git → scan all source files
   let dirtyFiles = getDirtyFiles(projectRoot);
   if (dirtyFiles === null) {
+    // git unavailable, fall back to scanning all files
     // git 不可用，回退到扫描全量文件
     dirtyFiles = scanAllSourceFiles(projectRoot);
   }
@@ -278,7 +284,7 @@ export async function initNiumWiki(projectRoot: string, force = false, primaryLa
   updateSourceIndex(projectRoot, changes.currentHashes);
 
   // 同步源文件到 .nium-wiki/raw/（受 config.json syncRaw 控制）/ Sync source files to .nium-wiki/raw/ (controlled by config.json syncRaw)
-  syncRawFiles(projectRoot);
+  syncRawFiles(projectRoot, changes.currentHashes);
 
   result.message = `Successfully initialized .nium-wiki directory, created ${result.created.length} files/directories`;
   return result;

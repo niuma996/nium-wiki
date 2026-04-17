@@ -86,6 +86,9 @@ export function createIgnore(projectRoot: string): Ignore {
   return ig;
 }
 
+/** Module-level cache for getExcludeDirs results, keyed by resolved projectRoot. */
+const _excludeCache = new Map<string, ExcludeResult>();
+
 /**
  * Return type for getExcludeDirs.
  * - dirs: Set of directory names for walkFiles (exact-match optimization)
@@ -100,16 +103,20 @@ export interface ExcludeResult {
 
 /**
  * Merge built-in exclusion dirs + config.json user-defined exclude + .gitignore.
- * / 合并内置排除目录 + config.json 用户自定义 exclude + .gitignore 目录。
+ * Results are cached per resolved projectRoot.
+ * / 合并内置排除目录 + config.json 用户自定义 exclude + .gitignore 目录。按 resolved projectRoot 缓存。
  */
 export function getExcludeDirs(projectRoot: string): ExcludeResult {
-  const config = loadConfig(projectRoot);
-  const ig = createIgnore(projectRoot);
+  const key = path.resolve(projectRoot);
+  if (_excludeCache.has(key)) return _excludeCache.get(key)!;
 
-  return {
-    // dirs: DEFAULT_EXCLUDE_DIRS + config.exclude (user-defined always included)
-    // gitignore-derived excludes are handled by the ignore instance
+  const config = loadConfig(key);
+  const ig = createIgnore(key);
+
+  const result: ExcludeResult = {
     dirs: new Set([...DEFAULT_EXCLUDE_DIRS, ...config.exclude]),
     ig,
   };
+  _excludeCache.set(key, result);
+  return result;
 }

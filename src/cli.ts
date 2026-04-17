@@ -15,25 +15,24 @@ function requireWikiDir(resolvedProjectRoot: string): boolean {
   const wikiDir = path.join(resolvedProjectRoot, '.nium-wiki');
   if (fs.existsSync(wikiDir)) return true;
 
+  // Normalize path: strip trailing slash to avoid path.dirname inconsistency
   // 标准化路径：去除末尾斜杠，避免 path.dirname 对 /root/skills/ 和 /root/skills 处理不一致
   const normalized = resolvedProjectRoot.replace(/\/$/, '');
   const parentDir = path.dirname(normalized);
   const parentWiki = path.join(parentDir, '.nium-wiki');
 
   if (fs.existsSync(parentWiki)) {
-    // .nium-wiki 在父目录中：检查 resolved 是否在 wiki 目录内部
-    // resolved.startsWith(parentWiki) 或 resolved === parentWiki 时，用户在 .nium-wiki/ 内或其本身
+    // .nium-wiki exists in parent dir — check if user is inside it
     const normalizedResolved = resolvedProjectRoot.replace(/\/$/, '');
     if (normalizedResolved === parentWiki || normalizedResolved.startsWith(parentWiki + '/')) {
+      // .nium-wiki in parent dir, user is inside it — block execution
       // 用户在 .nium-wiki/ 内执行（或传入了 .nium-wiki/ 本身）
       console.error(`❌ Cannot run from inside .nium-wiki/ directory.`);
       console.error(`   Current directory: ${resolvedProjectRoot}`);
       console.error(`   Run from project root: ${parentDir}`);
       console.error(`   Or pass the path explicitly:  nium-wiki <command> ${parentDir}`);
     } else {
-      // .nium-wiki 在项目父目录，但 resolved 不是其内部（正常场景：用户在项目根目录）
-      // 此时 wikiDir 不存在但 parentWiki 存在 = 正常，不需要报错
-      // 这种情况不应发生，因为最外层已 return true
+      // .nium-wiki exists in parent but resolved is outside — should not reach here (outer return handles normal case)
       console.error(`❌ .nium-wiki directory not found in: ${resolvedProjectRoot}`);
       console.error(`   Please run 'nium-wiki init' first to initialize.`);
     }
@@ -225,6 +224,7 @@ program
     const docIndex = buildDocIndex(resolved);
 
     // 用变更检测获取所有源文件列表，用于命名约定推断
+    // Use change detection to get all source file list for naming convention inference
     const changes = diffSourceIndex(resolved);
     const allSourceFiles = [...new Set([
       ...changes.added, ...changes.modified, ...changes.unchanged,
@@ -307,6 +307,7 @@ program
   .action((wikiPath: string, opts: { verbose: boolean; json?: string; mermaidStrict: boolean; role: string }) => {
     let resolved = path.resolve(wikiPath);
     // 如果传入的是项目根目录（没有 wiki/ 子目录），尝试向上找 .nium-wiki
+    // If passed project root (no wiki/ subdir), try to find .nium-wiki in parent
     if (!fs.existsSync(path.join(resolved, 'wiki'))) {
       const candidate = path.join(resolved, '.nium-wiki');
       if (fs.existsSync(candidate)) {
@@ -360,6 +361,7 @@ i18nCmd
   .action((wikiPath: string, opts: { lang?: string }) => {
     let resolved = path.resolve(wikiPath);
     // 如果传入项目根目录（没有 wiki/ 子目录），自动补全为 .nium-wiki
+    // If passed project root (no wiki/ subdir), auto-complete to .nium-wiki
     if (!fs.existsSync(path.join(resolved, 'wiki'))) {
       const candidate = path.join(resolved, '.nium-wiki');
       if (fs.existsSync(path.join(candidate, 'wiki'))) {

@@ -329,10 +329,12 @@ export function buildIncrementalPlan(options: IncrementalOptions): IncrementalPl
     affectedDocs = [...affectedDocMap.values()];
   }
 
-  // Step 7: Commit hashes and sync raw files if requested
+  // Step 7: Sync raw files to .nium-wiki/raw/ (always, if enabled)
+  syncRawFiles(projectRoot, sourceDiff.currentHashes);
+
+  // Commit hash baseline if requested
   if (commitHashes) {
     updateSourceIndex(projectRoot, sourceDiff.currentHashes);
-    syncRawFiles(projectRoot);
   }
 
   // Build summary

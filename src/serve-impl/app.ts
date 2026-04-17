@@ -116,6 +116,10 @@
     // Strip hash so /#/src/foo.ts → /src/foo.ts
     var cleanHref = href.replace(/^#/, '');
     var filePath = getSourceFilePath(cleanHref);
+
+    // "/" is the docsify homepage — never treat it as a source file path.
+    if (filePath === '/') return;
+
     e.preventDefault();
     e.stopPropagation();
 

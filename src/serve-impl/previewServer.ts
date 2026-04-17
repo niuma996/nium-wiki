@@ -89,10 +89,10 @@ function getCachedSidebar(wikiDir: string, lang: string): string {
 // SSE 热重载 / SSE hot reload
 // ─────────────────────────────────────────────
 
-/** 活跃的 SSE 客户端连接 */
+/** 活跃的 SSE 客户端连接 / Active SSE client connections */
 const sseClients = new Set<http.ServerResponse>();
 
-/** 向所有 SSE 客户端广播事件 */
+/** 向所有 SSE 客户端广播事件 / Broadcast event to all SSE clients */
 function broadcastSSE(data: object): void {
   const msg = `data: ${JSON.stringify(data)}\n\n`;
   for (const res of sseClients) {
@@ -104,7 +104,7 @@ function broadcastSSE(data: object): void {
   }
 }
 
-/** 失效侧边栏缓存并通知浏览器刷新 */
+/** 失效侧边栏缓存并通知浏览器刷新 / Invalidate sidebar cache and notify browser to reload */
 function invalidateAndReload(changedPath: string): void {
   sidebarCache.clear();
   broadcastSSE({ type: 'reload', path: changedPath });
@@ -116,18 +116,19 @@ function invalidateAndReload(changedPath: string): void {
 
 /**
  * 启动静态文件 HTTP 服务（支持多语言切换 + 热重载）
- * / Start static file HTTP server (supports multi-language switching + hot reload)
+ * Start static file HTTP server (supports multi-language switching + hot reload)
  */
 export function startServer(wikiBasePath: string, port: number, projectName?: string): http.Server {
   const { primaryWikiDir, languages } = prepareDocsify(wikiBasePath, projectName);
   const config = loadI18nConfig(wikiBasePath);
 
   // 所有语言 wiki 目录（用于文件监视）
+  // All language wiki directories (for file watching)
   const watchedDirs = new Set<string>([primaryWikiDir]);
   if (config?.primaryLang) {
     watchedDirs.add(path.join(wikiBasePath, `wiki_${config.primaryLang}`));
   }
-  // 监视器实例
+  // 监视器实例 / Watcher instances
   const watchers: fs.FSWatcher[] = [];
 
   function resolveWikiDir(req: http.IncomingMessage): { dir: string; lang: string } {
@@ -146,14 +147,15 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
     try {
       const watcher = fs.watch(dir, { recursive: true }, (eventType, filename) => {
         if (!filename) return;
+        // Only respond to .md files and _sidebar.md changes
         // 只响应 .md 文件和 _sidebar.md 变化
         if (filename.endsWith('.md') || filename === '.nojekyll') {
           invalidateAndReload(filename);
         }
       });
-      watcher.on('error', () => { /* 忽略单次监视错误 */ });
+      watcher.on('error', () => { /* ignore single watch error */ });
       watchers.push(watcher);
-    } catch { /* 忽略不可监视的目录 */ }
+    } catch { /* ignore inaccessible directories */ }
   }
 
   // ── HTTP 请求处理 / HTTP request handling ────
@@ -165,7 +167,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
       urlPath = '/';
     }
 
-    // 去掉 query string
+    // Strip query string / 去掉 query string
     const qIdx = urlPath.indexOf('?');
     const query = qIdx !== -1 ? urlPath.substring(qIdx + 1) : '';
     if (qIdx !== -1) urlPath = urlPath.substring(0, qIdx);
@@ -197,6 +199,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         'Connection': 'keep-alive',
         'X-Accel-Buffering': 'no',
       });
+      // Send initial connection acknowledgement
       // 发送初始连接确认
       res.write('data: {"type":"connected"}\n\n');
       sseClients.add(res);
@@ -242,6 +245,38 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         return;
       }
       const ext = path.extname(resolved).toLowerCase();
+
+      // Prism dependency graph: lang → additional script names (beyond base core+markup+clike)
+      const PRISM_DEPS: Record<string, string[]> = {
+        typescript: ['javascript'],
+        markup: [],
+        clike: [],
+        javascript: [],
+        css: [],
+        less: [],
+        scss: [],
+        'markup-templating': [],
+        php: ['markup-templating'],
+        java: ['java'],
+        kotlin: ['kotlin'],
+        scala: ['scala'],
+        ruby: ['ruby'],
+        python: ['python'],
+        bash: ['bash'],
+        json: ['json'],
+        yaml: ['yaml'],
+        go: ['go'],
+        rust: ['rust'],
+        csharp: ['csharp'],
+        fsharp: ['fsharp'],
+        vbnet: ['vbnet'],
+        c: ['c'],
+        cpp: ['cpp'],
+        toml: ['toml'],
+        markdown: ['markdown'],
+        plaintext: [],
+      };
+
       const langMap: Record<string, string> = {
         // JavaScript/TypeScript
         '.js': 'javascript', '.jsx': 'javascript',
@@ -271,6 +306,14 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         '.c': 'c', '.h': 'c', '.cpp': 'cpp', '.hpp': 'cpp',
       };
       const lang = langMap[ext] || 'plaintext';
+
+      // Build only the scripts needed for this language: base + deps
+      const deps = PRISM_DEPS[lang] ?? [];
+      const scripts = ['core', 'markup', 'clike', ...deps];
+      const prismScripts = scripts
+        .map(s => `  <script src="/_vendor/prismjs/prism-${s}.min.js"></script>`)
+        .join('\n');
+
       fs.readFile(resolved, (err, data) => {
         if (err) { res.writeHead(500); res.end('Internal Server Error'); return; }
         const content = data.toString('utf-8');
@@ -298,72 +341,29 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
   <div class="line-numbers">${lineNumbers}</div>
   <div class="code-content">${codeLines}</div>
 </div>
-<script src="/_vendor/prismjs/prism-core.min.js"></script>
-<script src="/_vendor/prismjs/prism-markup.min.js"></script>
-<script src="/_vendor/prismjs/prism-clike.min.js"></script>
-<script src="/_vendor/prismjs/prism-javascript.min.js"></script>
-<script src="/_vendor/prismjs/prism-typescript.min.js"></script>
-<script src="/_vendor/prismjs/prism-python.min.js"></script>
-<script src="/_vendor/prismjs/prism-json.min.js"></script>
-<script src="/_vendor/prismjs/prism-bash.min.js"></script>
-<script src="/_vendor/prismjs/prism-yaml.min.js"></script>
-<script src="/_vendor/prismjs/prism-go.min.js"></script>
-<script src="/_vendor/prismjs/prism-rust.min.js"></script>
-<script src="/_vendor/prismjs/prism-java.min.js"></script>
-<script src="/_vendor/prismjs/prism-kotlin.min.js"></script>
-<script src="/_vendor/prismjs/prism-scala.min.js"></script>
-<script src="/_vendor/prismjs/prism-ruby.min.js"></script>
-<script src="/_vendor/prismjs/prism-markup-templating.min.js"></script>
-<script src="/_vendor/prismjs/prism-php.min.js"></script>
-<script src="/_vendor/prismjs/prism-php-extras.min.js"></script>
-<script src="/_vendor/prismjs/prism-csharp.min.js"></script>
-<script src="/_vendor/prismjs/prism-fsharp.min.js"></script>
-<script src="/_vendor/prismjs/prism-visual-basic.min.js"></script>
-<script src="/_vendor/prismjs/prism-basic.min.js"></script>
-<script src="/_vendor/prismjs/prism-vbnet.min.js"></script>
-<script src="/_vendor/prismjs/prism-toml.min.js"></script>
-<script src="/_vendor/prismjs/prism-css.min.js"></script>
-<script src="/_vendor/prismjs/prism-less.min.js"></script>
-<script src="/_vendor/prismjs/prism-scss.min.js"></script>
-<script src="/_vendor/prismjs/prism-c.min.js"></script>
-<script src="/_vendor/prismjs/prism-cpp.min.js"></script>
-<script src="/_vendor/prismjs/prism-markdown.min.js"></script>
+${prismScripts}
 <script>
   (function() {
-    var langMap = {
-      'typescript': Prism.languages.typescript || Prism.languages.clike,
-      'javascript': Prism.languages.javascript || Prism.languages.clike,
-      'python': Prism.languages.python,
-      'bash': Prism.languages.bash,
-      'json': Prism.languages.json,
-      'go': Prism.languages.go,
-      'rust': Prism.languages.rust,
-      'java': Prism.languages.java,
-      'kotlin': Prism.languages.kotlin,
-      'scala': Prism.languages.scala,
-      'ruby': Prism.languages.ruby,
-      'php': Prism.languages.php,
-      'csharp': Prism.languages.csharp,
-      'fsharp': Prism.languages.fsharp,
-      'vbnet': Prism.languages.vbnet,
-      'markup': Prism.languages.markup,
-      'css': Prism.languages.css,
-      'c': Prism.languages.c,
-      'cpp': Prism.languages.cpp,
-      'markdown': Prism.languages.markdown,
-      'yaml': Prism.languages.yaml,
-      'toml': Prism.languages.toml
-    };
     var lang = '${lang}';
-    var grammar = langMap[lang] || Prism.languages.markup;
-
-    document.querySelectorAll('.code-line').forEach(function(el) {
-      var text = el.textContent || '';
-      if (grammar && text.trim()) {
-        var highlighted = Prism.highlight(text, grammar, lang);
-        el.innerHTML = highlighted;
+    // Fallback chain: specific lang → javascript → clike → markup → plaintext
+    var tries = 0;
+    function applyHighlight() {
+      var grammar = Prism.languages[lang]
+        || Prism.languages.javascript
+        || Prism.languages.clike
+        || Prism.languages.markup;
+      if (!grammar) {
+        if (++tries < 20) { setTimeout(applyHighlight, 25); return; }
+        return;
       }
-    });
+      document.querySelectorAll('.code-line').forEach(function(el) {
+        var text = el.textContent || '';
+        if (text.trim()) {
+          el.innerHTML = Prism.highlight(text, grammar, lang);
+        }
+      });
+    }
+    applyHighlight();
   })();
 </script>
 </body>
@@ -448,7 +448,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         return;
       }
 
-      // 普通文件
+      // Regular file / 普通文件
       const ext = path.extname(resolved).toLowerCase();
       const mime = MIME_TYPES[ext] || 'application/octet-stream';
 
@@ -467,6 +467,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
     });
   });
 
+  // Graceful shutdown: clean up all watchers and SSE connections
   // 优雅关闭：清理所有监视器和 SSE 连接
   server.on('close', () => {
     for (const w of watchers) {

@@ -135,9 +135,10 @@ function inferRoleFromWikiPath(wikiDir: string, filePath: string): string {
   const rel = path.relative(wikiDir, filePath).replace(/\\/g, '/');
   const firstDir = rel.split('/')[0];
 
+  // Top-level dir name maps directly (dir structure is more authoritative than filename)
   // 顶级目录名直接映射（目录结构比文件名更权威）
   if (['core', 'internal'].includes(firstDir)) return 'core';
-  // 其他顶级目录（api/, serve/, commands/ 等）按 filename 检测
+  // Other top-level dirs (api/, serve/, commands/, etc.) detected by filename / 其他顶级目录（api/, serve/, commands/ 等）按 filename 检测
   return 'auto';
 }
 
@@ -149,7 +150,7 @@ function calculateExpectedMetrics(filePath: string, role?: string): ExpectedMetr
     minExamples: 2,
   };
 
-  // 显式 role 优先（CLI --role 参数覆盖一切推断）
+  // Explicit role takes priority (CLI --role overrides all inference) / 显式 role 优先（CLI --role 参数覆盖一切推断）
   if (role === 'core') {
     expected.minLines = 150;
     expected.minSections = 6;
@@ -166,7 +167,7 @@ function calculateExpectedMetrics(filePath: string, role?: string): ExpectedMetr
     expected.minDiagrams = 0;
     expected.minExamples = 0;
   } else {
-    // 退化：文件名关键词检测（原有逻辑）
+    // Fallback: filename keyword detection (original logic) / 退化：文件名关键词检测（原有逻辑）
     const fileName = path.basename(filePath, '.md').toLowerCase();
 
     const coreKeywords = ['core', 'agent', 'editor', 'store', 'main', 'client'];
@@ -221,7 +222,7 @@ function generateIssues(
   explicitRole?: string,
 ): string[] {
   const issues: string[] = [];
-  // 推断顺序: explicit role > 目录结构 > 文件名
+  // Inference order: explicit role > dir structure > filename / 推断顺序: explicit role > 目录结构 > 文件名
   const role = explicitRole ?? (wikiDir ? inferRoleFromWikiPath(wikiDir, m.filePath) : 'auto');
   const expected = calculateExpectedMetrics(m.filePath, role);
 
@@ -394,6 +395,56 @@ function validateMermaidDiagram(
 }
 
 /**
+ * Auto-fix Mermaid ID conflicts by renaming duplicate IDs.
+ * Returns fixed diagram body and list of fixes applied.
+ */
+export function fixMermaidDiagram(body: string): { fixed: string; fixedIds: string[] } {
+  const lines = body.split('\n');
+  const fixedIds: string[] = [];
+  const allIds = new Set<string>();
+
+  const nodeIdRegex = /^([A-Za-z0-9_]+)\[/;
+  const subgraphIdRegex = /^subgraph\s+([A-Za-z0-9_]+)\[/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('%%')) continue;
+
+    // Process node IDs
+    const nodeMatch = line.match(nodeIdRegex);
+    if (nodeMatch) {
+      const id = nodeMatch[1];
+      if (allIds.has(id)) {
+        // ID conflict detected — auto-fix by renaming node
+        const newId = `${id}_node`;
+        lines[i] = lines[i].replace(new RegExp(`(?<!_)${id}(?=\\[)`), newId);
+        fixedIds.push(`${id} → ${newId}`);
+        allIds.add(newId);
+      } else {
+        allIds.add(id);
+      }
+    }
+
+    // Process subgraph IDs
+    const subgraphMatch = line.match(subgraphIdRegex);
+    if (subgraphMatch) {
+      const id = subgraphMatch[1];
+      if (allIds.has(id)) {
+        // ID conflict detected — auto-fix by renaming subgraph
+        const newId = `${id}_sub`;
+        lines[i] = lines[i].replace(new RegExp(`(?<!_)${id}(?=\\[)`), newId);
+        fixedIds.push(`${id} → ${newId}`);
+        allIds.add(newId);
+      } else {
+        allIds.add(id);
+      }
+    }
+  }
+
+  return { fixed: lines.join('\n'), fixedIds };
+}
+
+/**
  * Scan all mermaid blocks in a file and return issues.
  */
 export function checkMermaidSyntax(content: string): MermaidIssue[] {
@@ -401,8 +452,25 @@ export function checkMermaidSyntax(content: string): MermaidIssue[] {
   const blocks = extractMermaidBlocks(lines);
   const allIssues: MermaidIssue[] = [];
   for (const block of blocks) {
-    const issues = validateMermaidDiagram(block.body, block.line);
-    allIssues.push(...issues);
+    // Auto-fix ID conflicts before validation
+    const { fixed, fixedIds } = fixMermaidDiagram(block.body);
+    if (fixedIds.length > 0) {
+      // Downgrade conflicts to warnings since they are auto-fixed
+      for (const fix of fixedIds) {
+        allIssues.push({
+          severity: 'warn',
+          line: block.line,
+          message: `Auto-fixed ID conflict: ${fix}`,
+          suggestion: 'Diagram will render correctly',
+        });
+      }
+      // Validate the fixed diagram for remaining issues
+      const issues = validateMermaidDiagram(fixed, block.line);
+      allIssues.push(...issues);
+    } else {
+      const issues = validateMermaidDiagram(block.body, block.line);
+      allIssues.push(...issues);
+    }
   }
   return allIssues;
 }
@@ -436,7 +504,7 @@ export function analyzeDocument(
   try {
     content = fs.readFileSync(filePath, 'utf-8');
   } catch (e) {
-    metrics.issues.push(`无法读取文件: ${e}`);
+    metrics.issues.push(`Unable to read file: ${e}`);
     return metrics;
   }
 
@@ -528,6 +596,11 @@ export function analyzeWiki(wikiPath: string, defaultRole?: string): QualityRepo
 export function hasMermaidErrors(report: QualityReport): boolean {
   return report.docs.some(d => d.mermaidIssues.some(i => i.severity === 'error'));
 }
+
+/** Shell exit codes for doc quality level. */
+const EXIT_QUALITY_OK = 0;
+const EXIT_HAS_BASIC = 1;
+const EXIT_MOSTLY_BASIC = 2;
 
 export function printQualityReport(report: QualityReport, verbose = false): number {
   console.log('\n' + '='.repeat(60));
@@ -633,9 +706,9 @@ export function printQualityReport(report: QualityReport, verbose = false): numb
   console.log();
   console.log('='.repeat(60));
 
-  if (report.basicCount > report.totalDocs * 0.5) return 2;
-  if (report.basicCount > 0) return 1;
-  return 0;
+  if (report.basicCount > report.totalDocs * 0.5) return EXIT_MOSTLY_BASIC;
+  if (report.basicCount > 0) return EXIT_HAS_BASIC;
+  return EXIT_QUALITY_OK;
 }
 
 export function saveReportJson(report: QualityReport, outputPath: string): void {

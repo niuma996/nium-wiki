@@ -255,7 +255,7 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 | 5 | **Best Practices** | ⚡ OPTIONAL |
 | 6 | **Related Docs** | Cross-links |
 
-**Template selection**: Before generating each module's documentation, run `nium-wiki analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal:
+**Template selection**: Before generating each module's documentation, run `node scripts/index.js analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal:
 
 | `docScope` | Use this template | Lines target | Diagrams |
 |---|---|---|---|
@@ -282,6 +282,14 @@ Every code example must:
 - Every document MUST contain a **"Related Documents"** section at the end
 - Module docs should link outward to: architecture position, API reference, dependency graph
 - API docs should link back to: parent module, usage examples, type definitions
+
+**Path format rules for "Related Docs" table (Section 6 / Section 11 in templates)**:
+- **Wiki page links**: Use **relative paths** from the current doc's location. E.g., from `modules/badge.md`: `[version]({{ ../api/version.md }})` → resolved to `../api/version.md`
+- **Source file references**: Do NOT put source files (`.ts`, `.js`, etc.) in the Related Docs table. Source files belong in **section footers** with absolute paths: `[version.ts](/src/utils/version.ts#L1)`
+- **Wrong**: `[version.ts](/wiki/utils/version.md)` — mixes wiki path prefix with source file name
+- **Wrong**: `[version.ts](../modules/version.md)` — links to a wiki page, not the source file
+- **Correct (source)**: `[version.ts](/src/utils/version.ts#L1)`
+- **Correct (wiki page)**: `[API reference](../api/version.md)`
 
 ---
 
@@ -334,7 +342,7 @@ Normalize all paths relative to the project root.
 ### Step 1 — Pre-flight Check
 
 ```bash
-node skills/nium-wiki/scripts/index.js analyze-module <path> [--json]
+node scripts/index.js analyze-module <path> [--json]
 ```
 
 Read the returned `docScope` and `roleRecommendation`:
@@ -434,7 +442,8 @@ Resume from Step 1 Pre-flight Check, then proceed to generation
 User Input
   │
   ├─ "generate wiki" (no module specified)
-  │    └─ FULL pipeline → Section 1–11
+  │    ├─ .nium-wiki does not exist → init → FULL pipeline → Section 1–11
+  │    └─ .nium-wiki exists → FULL pipeline → Section 1–11
   │
   ├─ "generate wiki for <module>"
   │    ├─ .nium-wiki does not exist → init → MODULE_TARGETED
@@ -447,7 +456,7 @@ User Input
   │    └─ MODULE_TARGETED + force full regeneration
   │
   ├─ "analyze module X"
-  │    └─ Run `node skills/nium-wiki/scripts/index.js analyze-module <path> --json` — JSON signals only, no wiki files written
+  │    └─ Run `node scripts/index.js analyze-module <path> --json` — JSON signals only, no wiki files written
   │
   └─ "refresh / upgrade wiki" (no module)
        └─ MAINTENANCE → audit → regenerate failing docs
@@ -459,19 +468,28 @@ User Input
 
 ### 1. CLI Commands Quick Reference
 
+> **Execution context**: All `node scripts/index.js` commands below are run from the **skill root directory**
+> (the directory containing `SKILL.md`), NOT the user's project root. The working directory when
+> executing a skill is always the skill root — this is the industry-standard convention across all
+> Coding Agents (Claude Code, Trae, Cursor, CodeGPT, 通义灵码, etc.).
+>
+> Scripts inside `skills/` are portable: the same skill can be installed globally
+> (`<AGENT_HOME>/skills/nium-wiki/`) or project-locally (`./skills/nium-wiki/`) — the relative path
+> `scripts/index.js` always resolves correctly.
+
 ```bash
-node skills/nium-wiki/scripts/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de); run from project root
-node skills/nium-wiki/scripts/index.js analyze [path]             # Analyze project structure
-node skills/nium-wiki/scripts/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
-node skills/nium-wiki/scripts/index.js incremental [path]         # Run incremental pipeline: diff → deps → doc-index → affected docs; run from project root
-node skills/nium-wiki/scripts/index.js diff-index [path]          # Detect file changes (--no-update to skip hash write); run from project root
-node skills/nium-wiki/scripts/index.js build-index [path]          # Build source ↔ doc mapping index; run from project root
-node skills/nium-wiki/scripts/index.js build-deps [path]           # Build import/require dependency graph; run from project root
-node skills/nium-wiki/scripts/index.js audit-docs [.nium-wiki] [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
-node skills/nium-wiki/scripts/index.js serve [wiki-path]          # Start docsify server
+node scripts/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de); run from project root
+node scripts/index.js analyze [path]             # Analyze project structure
+node scripts/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
+node scripts/index.js incremental [path]         # Run incremental pipeline: diff → deps → doc-index → affected docs; run from project root
+node scripts/index.js diff-index [path]          # Detect file changes (--no-update to skip hash write); run from project root
+node scripts/index.js build-index [path]          # Build source ↔ doc mapping index; run from project root
+node scripts/index.js build-deps [path]           # Build import/require dependency graph; run from project root
+node scripts/index.js audit-docs [.nium-wiki] [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
+node scripts/index.js serve [wiki-path]          # Start docsify server
 ```
 
-For detailed usage, see `node skills/nium-wiki/scripts/index.js --help`
+For detailed usage, see `node scripts/index.js --help`
 
 > **⚠️ IMPORTANT**: All commands that take `[path]` (incremental, diff-index, build-index, build-deps, etc.)
 > **must be run from the project root directory**, or pass the absolute/relative path to the project root.
@@ -490,6 +508,19 @@ Before running any CLI commands or generating any documentation:
 > **Rule**: The `language` field in `config.json` is the **only authoritative source** for documentation language.
 > Do NOT infer language from source code comments, README, file names, or conversation context.
 
+#### 2.1 Language Conflict Resolution
+
+> **🔴 CRITICAL: Never modify `config.json` directly via file write or text replacement.**
+> Use the following procedures instead:
+
+| Scenario | Action |
+|----------|--------|
+| Config exists, user wants to add a secondary language (e.g. config=`en`, user wants to also generate `zh`) | Run `node scripts/index.js init [path] --lang zh` — appends `zh` as a secondary language to config |
+| User wants to change the primary language (e.g. config=`en`, user wants `zh` as primary) | Run `node scripts/index.js init [path] --lang zh --force` — overwrites primary language to `zh` |
+| User wants to generate docs in a language already in config | No config change needed — run `generate-toc --lang <code>` directly |
+
+**Why**: Direct file edits to `config.json` bypass the CLI's validation and can corrupt the JSON structure. Always go through the CLI.
+
 ### 4. Language Configuration
 
 Read `.nium-wiki/config.json` and extract the `language` setting.
@@ -506,7 +537,7 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 
 ### 5. Project Analysis (Deep)
 
-Run `node skills/nium-wiki/scripts/index.js analyze .` or analyze manually:
+Run `node scripts/index.js analyze .` or analyze manually:
 
 1. **Identify tech stack**: Check dependency manifests (e.g. package.json, requirements.txt, go.mod, Cargo.toml, pom.xml, etc.)
 2. **Find entry points**: Locate main source files (e.g. src/index.ts, main.py, main.go, main.rs, src/main/java/App.java, etc.)
@@ -536,7 +567,7 @@ Save structure to `cache/structure.json`.
 Use the **automated incremental pipeline** to detect changes and compute the precise list of affected docs in one step:
 
 ```bash
-node skills/nium-wiki/scripts/index.js incremental . [--no-commit] [-v]  # run from project root
+node scripts/index.js incremental . [--no-commit] [-v]  # run from project root
 ```
 
 This runs the full pipeline: `diff-index` → `build-deps` → `build-index` → transitive-impact → doc-dep analysis. It outputs:
@@ -622,10 +653,10 @@ Attach navigable source links next to documented symbols:
 - Sanitize link paths and build indexes **after** wiki files are written:
 
 ```bash
-node skills/nium-wiki/scripts/index.js sanitize-links .  # run from project root
-node skills/nium-wiki/scripts/index.js build-index .       # run from project root
-node skills/nium-wiki/scripts/index.js build-deps .       # run from project root
-node skills/nium-wiki/scripts/index.js diff-index .      # run from project root (--no-update to skip hash write)
+node scripts/index.js sanitize-links .  # run from project root
+node scripts/index.js build-index .       # run from project root
+node scripts/index.js build-deps .       # run from project root
+node scripts/index.js diff-index .      # run from project root (--no-update to skip hash write)
 ```
 
 > `sanitize-links` scans all wiki `.md` files and converts any `file://` absolute paths to project-root-relative paths. **MUST** run before `build-index`.
@@ -643,7 +674,7 @@ node skills/nium-wiki/scripts/index.js diff-index .      # run from project root
 
 #### 12.1 Build Translation Task List
 
-Run `node skills/nium-wiki/scripts/index.js i18n status .nium-wiki` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
+Run `node scripts/index.js i18n status .nium-wiki` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
 
@@ -669,10 +700,10 @@ After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 
 After ALL files are translated:
 ```bash
-node skills/nium-wiki/scripts/index.js i18n sync-memory .nium-wiki
+node scripts/index.js i18n sync-memory .nium-wiki
 ```
 
-Run `node skills/nium-wiki/scripts/index.js i18n status .nium-wiki` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
+Run `node scripts/index.js i18n status .nium-wiki` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
 
 **Delete rule**: When deleting any file from `wiki/` (e.g. because the source file was deleted), you **MUST** also delete the corresponding file from ALL `wiki_{lang}/` directories.
 
@@ -902,7 +933,7 @@ When module count > 10, source files > 50, or LOC > 10,000, switch to batch mode
 1. **Prioritize modules** — entry points (weight 5) > dependents (4) > has docs (3) > code size (2) > recently modified (1)
 2. **Generate 1-2 modules per batch** — depth scales with complexity
 3. **Track progress** in `cache/progress.json` — record completed/pending modules and current batch number
-4. **After each batch** — run `node skills/nium-wiki/scripts/index.js audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
+4. **After each batch** — run `node scripts/index.js audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
    - `"continue"` — next batch
    - `"audit docs"` — re-run validation
    - `"regenerate <module>"` — redo a specific module
@@ -921,8 +952,8 @@ When existing wiki docs are outdated or below quality gate, use one of these str
 | `incremental_upgrade` | Many modules, want to keep existing content | "upgrade wiki" |
 | `targeted_upgrade` | Only specific modules need attention | "upgrade \<module\> docs" |
 
-Execution: scan existing docs with `node skills/nium-wiki/scripts/index.js audit-docs .nium-wiki --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
+Execution: scan existing docs with `node scripts/index.js audit-docs .nium-wiki --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
 
 **Version footer** — append to every generated document:
-`*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/nium-wiki) | {{ GENERATED_AT }}*`
-(read version from `skills/nium-wiki/scripts/version.json` — `version` field)
+`*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/node scripts/index.js) | {{ GENERATED_AT }}*`
+(read version from `skills/node scripts/index.js/scripts/version.json` — `version` field)

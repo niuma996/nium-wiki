@@ -158,6 +158,41 @@ export function inferLangFromDir(wikiDir: string, fallback = 'en'): string {
   return match ? match[1] : fallback;
 }
 
+/**
+ * 将语言追加到 config.json 的 language 字段（如果尚未存在）。
+ * 仅追加为副语言，不改动主语言。
+ * @param wikiPath — .nium-wiki 目录路径
+ * @param lang — 要追加的语言代码
+ * Returns true if appended, false if already present / skipped / error.
+ */
+export function appendLangToConfig(wikiPath: string, lang: string): boolean {
+  if (!isSupportedLang(lang)) return false;
+  const configPath = path.join(wikiPath, 'config.json');
+  if (!fs.existsSync(configPath)) return false;
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch {
+    return false;
+  }
+
+  const langStr: string = (config.language as string) ?? '';
+  if (!langStr) return false;
+
+  const parts = langStr.split('/').map(p => p.trim()).filter(Boolean);
+  if (parts.includes(lang)) return false; // 已存在
+
+  parts.push(lang);
+  config.language = parts.join('/');
+  try {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 从 config.json 读取 primary language（仅从 .nium-wiki/config.json，不 fallback）/ Read primary language from config.json only — no fallback */
 export function getPrimaryLangFromConfig(wikiDir: string): string | undefined {
   // Resolve relative paths first — path.dirname('.nium-wiki') returns '.', not the parent,

@@ -296,7 +296,8 @@ function validateMermaidDiagram(
   // Mermaid uses a shared namespace for all IDs
   const allIds = new Map<string, { line: number; type: 'node' | 'subgraph' }>();
   const nodeIdRegex = /^([A-Za-z0-9_]+)\[/;
-  const subgraphIdRegex = /^subgraph\s+([A-Za-z0-9_]+)\[/;
+  // subgraph ID[...] or subgraph ID [...] - ID and [ may have spaces between them
+  const subgraphIdRegex = /^subgraph\s+([A-Za-z0-9_]+)\s*\[/;
 
   for (let i = 0; i < diagramLines.length; i++) {
     const line = diagramLines[i].trim();
@@ -452,24 +453,27 @@ export function checkMermaidSyntax(content: string): MermaidIssue[] {
   const blocks = extractMermaidBlocks(lines);
   const allIssues: MermaidIssue[] = [];
   for (const block of blocks) {
-    // Auto-fix ID conflicts before validation
+    // First validate the original diagram for ID conflicts
+    const originalIssues = validateMermaidDiagram(block.body, block.line);
+    allIssues.push(...originalIssues);
+    
+    // Also check for auto-fixable issues and report them as warnings
     const { fixed, fixedIds } = fixMermaidDiagram(block.body);
     if (fixedIds.length > 0) {
-      // Downgrade conflicts to warnings since they are auto-fixed
       for (const fix of fixedIds) {
-        allIssues.push({
-          severity: 'warn',
-          line: block.line,
-          message: `Auto-fixed ID conflict: ${fix}`,
-          suggestion: 'Diagram will render correctly',
-        });
+        // Check if this fix was already reported as an error
+        const alreadyReported = originalIssues.some(
+          issue => issue.message.includes('duplicates') && issue.message.includes(fix.split(' → ')[0])
+        );
+        if (!alreadyReported) {
+          allIssues.push({
+            severity: 'warn',
+            line: block.line,
+            message: `Auto-fixed ID conflict: ${fix}`,
+            suggestion: 'Fixed automatically, but please update source to avoid this warning',
+          });
+        }
       }
-      // Validate the fixed diagram for remaining issues
-      const issues = validateMermaidDiagram(fixed, block.line);
-      allIssues.push(...issues);
-    } else {
-      const issues = validateMermaidDiagram(block.body, block.line);
-      allIssues.push(...issues);
     }
   }
   return allIssues;

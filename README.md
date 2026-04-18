@@ -14,6 +14,7 @@ A skill for AI coding tools (e.g., Claude Code) that turns codebases into high-q
 - 📊 **Mermaid Diagrams**: Auto-generated architecture, data flow, and dependency diagrams
 - 🔗 **Cross-linked Documentation**: Bidirectional links between docs with source traceability
 - ⚡ **Incremental Updates**: SHA256-based change detection for efficient regeneration
+- 💡 **Compiled, Not Retrieved**: Aligned with the Karpathy LLM Wiki pattern — docs are compiled upfront, updated incrementally
 - 🌐 **Multi-language Support**: Works with JS/TS/Python/Go/Rust/Java and 10+ languages
 - 🔒 **Fully Offline**: Zero external dependencies, works in air-gapped environments
 - 📝 **Professional Output**: Enterprise-grade documentation with automated quality auditing
@@ -96,7 +97,7 @@ npx nium-wiki serve --port 3000
 npx nium-wiki serve .nium-wiki/wiki
 ```
 
-Open `http://localhost:4000` in your browser to preview the generated docs, with full-text search, sidebar navigation, and Mermaid diagram rendering.
+Open `http://localhost:4000` in your browser to preview the generated docs, with full-text search, sidebar navigation, Mermaid diagram rendering, and a **source code drawer** that opens when you click any source file link in the wiki.
 
 ### Wiki Generation Showcase
 
@@ -153,6 +154,7 @@ Nium-Wiki is designed to leverage the AI coding tool's existing understanding of
 - Continuously optimizing documentation quality while reducing model interaction rounds
 - Centralized documentation management service
 - Intelligent search tooling (cross-project)
+- Karpathy LLM Wiki Schema Layer: Explicitly model document organization rules as a first-class schema for more precise and consistent incremental updates
 
 ## Use Cases
 

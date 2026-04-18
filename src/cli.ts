@@ -44,7 +44,7 @@ function requireWikiDir(resolvedProjectRoot: string): boolean {
 }
 
 import { initNiumWiki, printInitResult } from './infra/initWiki';
-import { getOsLang, loadI18nConfig } from './utils/i18n';
+import { getOsLang, loadI18nConfig, appendLangToConfig } from './utils/i18n';
 import { analyzeProject, printAnalysis } from './core/analyzeProject';
 import { diffSourceIndex, updateSourceIndex, printSourceDiff } from './core/sourceIndex';
 import { extractDocsFromFile, docsToMarkdown } from './core/extractDocs';
@@ -90,10 +90,24 @@ program
   .option('-l, --lang <code>', 'Primary language code (zh/en/ja/ko/fr/de), defaults to system language')
   .action(async (projectPath: string, opts: { force: boolean; lang?: string }) => {
     const resolved = path.resolve(projectPath);
+    const wikiDir = path.join(resolved, '.nium-wiki');
+
+    // Non-force: if .nium-wiki exists and --lang is given, append lang as secondary language
+    if (!opts.force && opts.lang) {
+      const appended = appendLangToConfig(wikiDir, opts.lang);
+      if (appended) {
+        console.log(`ℹ️  Language '${opts.lang}' added to config.json`);
+      }
+      // initNiumWiki is not needed in this path — just report success
+      printInitResult({ success: true, created: [], skipped: [], message: 'Language updated in existing config' });
+      process.exitCode = 0;
+      return;
+    }
+
+    // Normal init path
     let primaryLang = opts.lang || getOsLang();
     // Re-init: preserve existing language from config.json instead of overwriting with system lang
     if (opts.force && !opts.lang) {
-      const wikiDir = path.join(resolved, '.nium-wiki');
       const existing = loadI18nConfig(wikiDir);
       if (existing?.primaryLang) {
         primaryLang = existing.primaryLang;
@@ -340,7 +354,12 @@ program
   .option('--sidebar', 'Also generate sidebar JSON', false)
   .option('--lang <code>', 'Specify language code (defaults to directory name inference)')
   .action((wikiDir: string, opts: { sidebar: boolean; lang?: string }) => {
-    const resolved = path.resolve(wikiDir || path.join('.nium-wiki', 'wiki'));
+    const wikiRoot = path.resolve(wikiDir || path.join('.nium-wiki'));
+    const resolved = path.join(wikiRoot, 'wiki');
+    if (opts.lang) {
+      const appended = appendLangToConfig(wikiRoot, opts.lang);
+      if (appended) console.log(`ℹ️  Language '${opts.lang}' added to config.json`);
+    }
     console.log(generateToc(resolved, '/', opts.lang));
     if (opts.sidebar) {
       console.log('\n=== Sidebar JSON ===');

@@ -13,8 +13,40 @@ import { execSync } from 'child_process';
 import { MIME_TYPES } from './utils';
 import { handleVendorRequest } from './vendor';
 import { generateDocsifyIndex, getLangLabel, LangOption } from './templates';
+import { getSidebarMarkdown } from './sidebarJson';
 import { generateSidebarMd } from './sidebar';
+import { generateSidebarJson, migrateFromSidebarMd } from '../generation/generateSidebarJson';
 import { loadI18nConfig, getAvailableLanguages } from '../utils/i18n';
+
+// ─────────────────────────────────────────────
+// Sidebar bootstrap: ensure sidebar.json exists
+// ─────────────────────────────────────────────
+
+/**
+ * Ensure sidebar.json exists in the wiki directory.
+ * Server-side bootstrap — called once at startup, not on each request.
+ *
+ * 兜底逻辑：
+ *   - 已有 sidebar.json → 跳过
+ *   - 有 _sidebar.md → 迁移
+ *   - 均无 → 扫描目录生成（目录名作为 alias，folder-aliases.json 不存在时直接用目录名）
+ */
+function ensureSidebarJson(wikiDir: string, lang: string): void {
+  const sidebarJsonPath = path.join(wikiDir, 'sidebar.json');
+  const legacyPath = path.join(wikiDir, '_sidebar.md');
+
+  if (fs.existsSync(sidebarJsonPath)) return;
+
+  if (fs.existsSync(legacyPath)) {
+    const markdown = fs.readFileSync(legacyPath, 'utf-8');
+    migrateFromSidebarMd(wikiDir, markdown);
+    return;
+  }
+
+  // 目录扫描生成，folder-aliases.json 不存在时用目录名本身作为 label
+  const content = generateSidebarJson(wikiDir, lang);
+  fs.writeFileSync(sidebarJsonPath, content, 'utf-8');
+}
 
 /**
  * 准备所有可用语言的 wiki 目录用于 docsify 服务 / Prepare wiki directories for all available languages for docsify service
@@ -36,17 +68,19 @@ export function prepareDocsify(
     label: getLangLabel(a.lang),
   }));
 
-  // 为每个可用语言目录生成 docsify 文件 / Generate docsify files for each available language directory
+  // 为每个可用语言目录准备 docsify 文件（server 动态返回 index.html，不写磁盘）
   for (const a of available) {
-    fs.writeFileSync(path.join(a.dir, 'index.html'), generateDocsifyIndex(name, languages, a.lang), 'utf-8');
-    fs.writeFileSync(path.join(a.dir, '_sidebar.md'), generateSidebarMd(a.dir, a.lang), 'utf-8');
     const nojekyllPath = path.join(a.dir, '.nojekyll');
     if (!fs.existsSync(nojekyllPath)) {
       fs.writeFileSync(nojekyllPath, '', 'utf-8');
     }
+
+    // 兜底：确保 sidebar.json 存在（server 启动时一次性完成，不在请求路径上判断）
+    ensureSidebarJson(a.dir, a.lang);
+
     // 生成搜索索引 / Build search index
     try {
-      execSync(`node "${path.resolve(__dirname, '..', '..', 'scripts', 'build-search-index.js')}" "${a.dir}"`, {
+      execSync(`node "${path.resolve(__dirname, '..', '..', 'scripts', 'build-search-index.mjs')}" "${a.dir}"`, {
         stdio: 'pipe',
         timeout: 30000,
       });
@@ -56,6 +90,29 @@ export function prepareDocsify(
   }
 
   return { primaryWikiDir: primaryDir, languages };
+}
+
+// ─────────────────────────────────────────────
+// Index.html 内存缓存 / Index.html in-memory cache
+// ─────────────────────────────────────────────
+
+/** key: wikiDir, value: cached HTML string */
+const indexHtmlCache = new Map<string, string>();
+
+/**
+ * Get the dynamically-generated index.html for a given wiki directory.
+ * Cached per wikiDir — languages are handled by the lang switcher in the HTML.
+ */
+function getCachedIndexHtml(
+  wikiDir: string,
+  projectName: string,
+  languages: LangOption[],
+): string {
+  const cached = indexHtmlCache.get(wikiDir);
+  if (cached) return cached;
+  const html = generateDocsifyIndex(projectName, languages);
+  indexHtmlCache.set(wikiDir, html);
+  return html;
 }
 
 function parseCookie(req: http.IncomingMessage): Record<string, string> {
@@ -77,11 +134,19 @@ const sidebarCache = new Map<string, string>();
 
 function getCachedSidebar(wikiDir: string, lang: string): string {
   const key = `${wikiDir}:${lang}`;
-  let content = sidebarCache.get(key);
-  if (!content) {
+  const cached = sidebarCache.get(key);
+  if (cached) return cached;
+
+  // 优先从 sidebar.json 渲染（server 端读 JSON，不写文件）
+  let content: string;
+  const fromJson = getSidebarMarkdown(wikiDir, lang);
+  if (fromJson !== null) {
+    content = fromJson;
+  } else {
+    // 老 wiki 兼容：sidebar.json 不存在，fallback 到旧逻辑
     content = generateSidebarMd(wikiDir, lang);
-    sidebarCache.set(key, content);
   }
+  sidebarCache.set(key, content);
   return content;
 }
 
@@ -121,6 +186,7 @@ function invalidateAndReload(changedPath: string): void {
 export function startServer(wikiBasePath: string, port: number, projectName?: string): http.Server {
   const { primaryWikiDir, languages } = prepareDocsify(wikiBasePath, projectName);
   const config = loadI18nConfig(wikiBasePath);
+  const name = projectName || path.basename(path.resolve(wikiBasePath, '..'));
 
   // 所有语言 wiki 目录（用于文件监视）
   // All language wiki directories (for file watching)
@@ -149,7 +215,12 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         if (!filename) return;
         // Only respond to .md files and _sidebar.md changes
         // 只响应 .md 文件和 _sidebar.md 变化
-        if (filename.endsWith('.md') || filename === '.nojekyll') {
+        if (
+          filename.endsWith('.md') ||
+          filename === '.nojekyll' ||
+          filename === 'sidebar.json' ||
+          filename === 'folder-aliases.json'
+        ) {
           invalidateAndReload(filename);
         }
       });
@@ -392,6 +463,14 @@ ${prismScripts}
       urlPath = '/index.html';
     }
 
+    // index.html 请求从内存动态返回 / Serve index.html from memory
+    if (urlPath === '/index.html' || urlPath === 'index.html') {
+      const html = getCachedIndexHtml(wikiDir, name, languages);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(html);
+      return;
+    }
+
     const filePath = path.join(wikiDir, urlPath);
 
     // 安全检查：防止路径遍历 / Security check: prevent path traversal
@@ -406,17 +485,10 @@ ${prismScripts}
     fs.stat(resolved, (err, stats) => {
       if (err || !stats) {
         // docsify SPA fallback：非文件请求返回 index.html / docsify SPA fallback: non-file requests return index.html
-        const indexFile = path.join(wikiDir, 'index.html');
-        if (fs.existsSync(indexFile) && !urlPath.includes('.')) {
-          fs.readFile(indexFile, (readErr, data) => {
-            if (readErr) {
-              res.writeHead(500);
-              res.end('Internal Server Error');
-              return;
-            }
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(data);
-          });
+        if (!urlPath.includes('.')) {
+          const html = getCachedIndexHtml(wikiDir, name, languages);
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+          res.end(html);
           return;
         }
         res.writeHead(404);
@@ -425,26 +497,20 @@ ${prismScripts}
       }
 
       if (stats.isDirectory()) {
-        // 目录请求：尝试 index.html 或 index.md / Directory request: try index.html or index.md
-        const dirIndex = path.join(resolved, 'index.html');
+        // 目录请求：优先 index.md，否则返回动态 index.html / Directory: prefer index.md, fallback to dynamic index.html
         const dirMd = path.join(resolved, 'index.md');
-        const target = fs.existsSync(dirIndex) ? dirIndex : fs.existsSync(dirMd) ? dirMd : null;
-        if (target) {
-          const ext = path.extname(target);
-          const mime = MIME_TYPES[ext] || 'application/octet-stream';
-          fs.readFile(target, (readErr, data) => {
-            if (readErr) {
-              res.writeHead(500);
-              res.end('Internal Server Error');
-              return;
-            }
-            res.writeHead(200, { 'Content-Type': mime });
+        if (fs.existsSync(dirMd)) {
+          fs.readFile(dirMd, (readErr, data) => {
+            if (readErr) { res.writeHead(500); res.end('Internal Server Error'); return; }
+            res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8' });
             res.end(data);
           });
-        } else {
-          res.writeHead(404);
-          res.end('Not Found');
+          return;
         }
+        // 无 index.md → 返回动态 index.html
+        const html = getCachedIndexHtml(wikiDir, name, languages);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+        res.end(html);
         return;
       }
 

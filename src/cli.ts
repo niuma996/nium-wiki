@@ -55,6 +55,7 @@ import {
   hasMermaidErrors,
 } from './core/auditDocs';
 import { generateToc, generateSidebar } from './generation/generateToc';
+import { writeSidebarJson, generateSidebarJson, migrateFromSidebarMd } from './generation/generateSidebarJson';
 import { buildDocIndex, enrichWithInference, saveDocIndex } from './core/buildDocIndex';
 import { buildDependencyGraph, saveDependencyGraph, loadDependencyGraph } from './core/buildDeps';
 import {
@@ -344,6 +345,112 @@ program
       return;
     }
     process.exitCode = exitCode;
+  });
+
+// ── generate-sidebar ─────────────────────────────────────
+
+/**
+ * Process a single wiki directory: detect state and apply appropriate action.
+ * 幂等：
+ *   - 已有 sidebar.json → 无操作
+ *   - 有 _sidebar.md → 迁移，删除旧文件
+ *   - 均无 → 扫描生成
+ */
+function processSidebarForDir(wikiDir: string, lang: string | undefined, force: boolean): void {
+  const sidebarJsonPath = path.join(wikiDir, 'sidebar.json');
+  const legacyPath = path.join(wikiDir, '_sidebar.md');
+
+  const hasSidebarJson = fs.existsSync(sidebarJsonPath);
+  const hasLegacySidebar = fs.existsSync(legacyPath);
+
+  if (force) {
+    writeSidebarJson(wikiDir, lang);
+    console.log(`🔄 [${lang}] Force regenerated sidebar.json → ${wikiDir}/sidebar.json`);
+    if (hasLegacySidebar) {
+      fs.unlinkSync(legacyPath);
+      console.log(`🗑  Removed legacy _sidebar.md`);
+    }
+    return;
+  }
+
+  if (hasSidebarJson) {
+    console.log(`ℹ️  [${lang}] sidebar.json already exists, skipping → ${sidebarJsonPath}`);
+    return;
+  }
+
+  if (hasLegacySidebar) {
+    const markdown = fs.readFileSync(legacyPath, 'utf-8');
+    migrateFromSidebarMd(wikiDir, markdown);
+    console.log(`⚙️  [${lang}] Migrated _sidebar.md → sidebar.json → ${sidebarJsonPath}`);
+    return;
+  }
+
+  writeSidebarJson(wikiDir, lang);
+  console.log(`✅ [${lang}] Generated sidebar.json → ${wikiDir}/sidebar.json`);
+}
+
+program
+  .command('generate-sidebar')
+  .description('Generate or migrate sidebar.json from wiki directory structure')
+  .argument('[wiki-path]', '.nium-wiki directory path', '.nium-wiki')
+  .option('--lang <code>', 'Language code (defaults to primaryLang from config)')
+  .option('--all', 'Process all available language directories', false)
+  .option('--print', 'Print to stdout instead of writing to disk', false)
+  .option('--force', 'Regenerate even if sidebar.json already exists', false)
+  .action((wikiPath: string, opts: { lang?: string; all: boolean; print: boolean; force: boolean }) => {
+    let resolved = path.resolve(wikiPath);
+    if (!fs.existsSync(path.join(resolved, 'wiki'))) {
+      const candidate = path.join(resolved, '.nium-wiki');
+      if (fs.existsSync(path.join(candidate, 'wiki'))) {
+        resolved = candidate;
+      }
+    }
+    const wikiDir = path.join(resolved, 'wiki');
+    if (!fs.existsSync(wikiDir)) {
+      console.error(`❌ Wiki directory not found: ${wikiDir}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const config = loadI18nConfig(resolved);
+    const primaryLang = config?.primaryLang;
+
+    if (opts.print) {
+      const lang = opts.lang ?? primaryLang;
+      console.log(generateSidebarJson(wikiDir, lang));
+      return;
+    }
+
+    if (opts.all) {
+      const allLangs = [primaryLang, ...(config?.secondaryLangs ?? [])].filter(Boolean);
+      for (const lang of allLangs) {
+        const targetDir = lang === primaryLang ? wikiDir : path.join(resolved, `wiki_${lang}`);
+        if (!fs.existsSync(targetDir)) continue;
+        processSidebarForDir(targetDir, lang, opts.force);
+      }
+    } else {
+      processSidebarForDir(wikiDir, primaryLang ?? 'en', opts.force);
+
+      for (const secondary of config?.secondaryLangs ?? []) {
+        const secondaryDir = path.join(resolved, `wiki_${secondary}`);
+        if (fs.existsSync(secondaryDir)) {
+          processSidebarForDir(secondaryDir, secondary, opts.force);
+        }
+      }
+    }
+
+    if (!opts.force) {
+      const aliasPath = path.join(wikiDir, 'folder-aliases.json');
+      if (!fs.existsSync(aliasPath)) {
+        console.log(`\n💡 No folder-aliases.json found. Create it to customize directory labels per language:`);
+        console.log(`   ${aliasPath}`);
+        console.log(`\n   Example:`);
+        console.log(`   {`);
+        console.log(`     "modules": { "zh": "模块文档", "en": "Modules" },`);
+        console.log(`     "guides":  { "zh": "使用指南", "en": "Guides" }`);
+        console.log(`   }`);
+      }
+    }
   });
 
 // ── generate-toc ──────────────────────────────────────────

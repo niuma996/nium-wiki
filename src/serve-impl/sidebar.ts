@@ -1,6 +1,11 @@
 /**
  * Sidebar Generation: Recursively scan wiki directory, generate _sidebar.md
  * 侧边栏生成：递归扫描 wiki 目录，生成 _sidebar.md
+ *
+ * @deprecated Use src/generation/generateSidebarJson + src/serve-impl/sidebarJson instead.
+ *            This module is kept for legacy wiki compatibility (fallback when sidebar.json is absent).
+ *            不再用于新 wiki——请使用 generateSidebarJson + sidebarJson 模块。
+ *            本模块仅作为老 wiki 的 fallback 保留。
  */
 
 import * as fs from 'fs';
@@ -28,6 +33,9 @@ function extractTitle(filePath: string, labels: TocLabels): string {
 /**
  * Recursively scan wiki directory, generate _sidebar.md content
  * 递归扫描 wiki 目录，生成 _sidebar.md 内容
+ *
+ * @deprecated Use generateSidebarJson + getSidebarMarkdown instead.
+ *            This function is called only when sidebar.json does not exist (legacy fallback).
  */
 export function generateSidebarMd(wikiDir: string, lang?: string): string {
   const resolvedLang = lang ?? inferLangFromDir(wikiDir);

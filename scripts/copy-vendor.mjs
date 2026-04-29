@@ -4,9 +4,12 @@
  * Only copy files actually needed by the serve page, not the entire package
  */
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DIST_VENDOR = path.join(__dirname, '..', 'dist', 'vendor');
 const DIST_SERVE_IMPL = path.join(__dirname, '..', 'dist', 'serve-impl');

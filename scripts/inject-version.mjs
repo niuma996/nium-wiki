@@ -4,8 +4,13 @@
  * This makes the version available regardless of where the skill is copied to.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 
 const version = require('../package.json').version;
 const bundlePath = path.join(__dirname, '..', 'skills', 'nium-wiki', 'scripts', 'index.js');

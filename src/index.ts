@@ -86,19 +86,3 @@ export type { WalkOptions } from './utils/fileWalker';
 export { loadCache, saveCache } from './utils/cache';
 
 export { getVersion } from './utils/version';
-
-export {
-  generateBadgeSVG,
-  generateInlineBadge,
-  generateHTMLBadge,
-  generateTextBadge,
-  BADGE_COLORS,
-  createVersionBadge,
-  createLicenseBadge,
-  createBuildBadge,
-  createCoverageBadge,
-  createLanguageBadge,
-  createCustomBadge,
-  generateProjectBadges,
-} from './utils/badge';
-export type { BadgeOptions, ProjectBadges } from './utils/badge';

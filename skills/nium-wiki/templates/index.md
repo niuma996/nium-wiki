@@ -8,11 +8,6 @@
 
 ---
 
-<!-- Badges (local SVG, no external CDN) -->
-{{ BADGE_VERSION }}
-{{ BADGE_LICENSE }}
-{{ BADGE_BUILD }}
-
 # {{ PROJECT_NAME }}
 
 > {{ ONE_LINER_DESCRIPTION }}

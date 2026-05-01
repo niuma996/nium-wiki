@@ -130,9 +130,6 @@ After initialization, a default config is generated at `.nium-wiki/config.json`:
 
 Nium-Wiki is designed to work completely offline with **zero external dependencies**, perfect for enterprise internal networks and air-gapped environments:
 
-### Documentation Generation
-- ✅ Badge generation uses inline SVG (no shields.io dependency)
-
 ### Preview Server
 - ✅ All frontend assets (Docsify, Prism.js, Mermaid) are bundled locally
 - ✅ No CDN requests or external API calls

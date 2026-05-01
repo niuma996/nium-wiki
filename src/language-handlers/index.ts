@@ -5,6 +5,9 @@
  * 负责注册和管理所有语言处理模块
  */
 
+import { extname } from 'path';
+import { existsSync, readdirSync } from 'fs';
+import { resolve } from 'path';
 import { LanguageHandler, DirectoryDescription, VersionInfo, DocEntry, ComplexityConfig, ImportResolveConfig } from './base';
 
 // Pre-import language handler modules / 预导入语言处理模块
@@ -148,7 +151,6 @@ export class LanguageHandlerManager {
    * @param filePath File path / 文件路径
    */
   public detectLanguageFromFile(filePath: string): string | null {
-    const { extname } = require('path');
     const ext = extname(filePath).toLowerCase();
     return EXTENSION_LANGUAGE_MAP[ext] || null;
   }
@@ -159,8 +161,6 @@ export class LanguageHandlerManager {
    * @param projectRoot Project root directory / 项目根目录
    */
   public detectProjectLanguages(projectRoot: string): string[] {
-    const { existsSync } = require('fs');
-    const { resolve } = require('path');
     const detectedLanguages: string[] = [];
 
     for (const handler of this.handlers.values()) {
@@ -171,7 +171,7 @@ export class LanguageHandlerManager {
           const dir = resolve(projectRoot, indicator.split('/')[0]);
           if (existsSync(dir)) {
             try {
-              const files = require('fs').readdirSync(dir);
+              const files = readdirSync(dir);
               const pattern = new RegExp('^' + indicator.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
               if (files.some((f: string) => pattern.test(f))) {
                 detectedLanguages.push(handler.getLanguageId());

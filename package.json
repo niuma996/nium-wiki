@@ -40,14 +40,14 @@
     "dist/"
   ],
   "dependencies": {
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "ignore": "^7.0.5"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@vercel/ncc": "^0.38.4",
     "docsify": "^4.13.1",
     "docsify-mermaid": "^2.0.1",
-    "ignore": "^7.0.5",
     "mermaid": "^10.9.0",
     "prismjs": "^1.29.0",
     "ts-node": "^10.9.2",

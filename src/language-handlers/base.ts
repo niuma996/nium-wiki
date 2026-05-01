@@ -3,6 +3,10 @@
  * 定义各语言处理模块需要实现的方法
  */
 
+import { existsSync, readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
+import { resolve } from 'path';
+
 /**
  * 目录描述接口
  */
@@ -278,8 +282,6 @@ export abstract class BaseLanguageHandler implements LanguageHandler {
    * 检测项目类型（默认实现，子类可覆盖）
    */
   async detectProjectTypes(projectRoot: string): Promise<ProjectTypeDetection> {
-    const { existsSync } = await import('fs');
-    const { readFileSync } = await import('fs');
 
     const types: string[] = [];
     const packageManager: string[] = [];
@@ -314,9 +316,6 @@ export abstract class BaseLanguageHandler implements LanguageHandler {
     options: FindEntryPointsConfig
   ): Promise<string[]> {
     const entryPoints: Set<string> = new Set();
-    const { existsSync } = await import('fs');
-    const { readFile } = await import('fs/promises');
-    const { resolve } = await import('path');
 
     // 1. 检查常见入口文件
     if (options.commonEntries) {
@@ -401,9 +400,6 @@ export abstract class BaseLanguageHandler implements LanguageHandler {
     standards: { [name: string]: string[] | { files: string[], contentCheck?: (content: string) => boolean } }
   ): Promise<string[]> {
     const detectedStandards: string[] = [];
-    const { existsSync } = await import('fs');
-    const { readFile } = await import('fs/promises');
-    const { resolve } = await import('path');
 
     for (const [standardName, config] of Object.entries(standards)) {
       let found = false;

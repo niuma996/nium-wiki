@@ -279,7 +279,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
     }
 
     // /_is-source?path=<encoded-path> → check if file exists in .nium-wiki/raw/
-    // Returns 200 + "1" if exists, 404 + "0" if not
+    // Always returns 200; body is "1" if exists, "0" if not
     if (urlPath.startsWith('/_is-source')) {
       const params = new URLSearchParams(query);
       const filePath = params.get('path') ?? '/';
@@ -293,7 +293,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         return;
       }
       const exists = fs.existsSync(resolved);
-      res.writeHead(exists ? 200 : 404);
+      res.writeHead(200);
       res.end(exists ? '1' : '0');
       return;
     }

@@ -207,22 +207,7 @@ Attribution is **not required** for:
 
 **General rules**: larger source files → longer docs; more exports → more examples; more dependents → more diagrams.
 
-#### Context Adaptation
-
-| Project Type | Focus Areas |
-|-------------|-------------|
-| **frontend** | Component Props, state management, UI interaction |
-| **backend** | API endpoints, data models, middleware |
-| **fullstack** | Frontend-backend interaction, data flow, deployment |
-| **library** | API docs, type definitions, compatibility |
-| **cli** | Command arguments, config files, usage |
-
-| Language | Example Style |
-|----------|--------------|
-| **TypeScript** | Type annotations, generics, interfaces |
-| **Python** | Docstrings, type hints, decorators |
-| **Go** | Error handling, concurrency, interfaces |
-| **Rust** | Ownership, lifetimes, error handling |
+> In incremental mode, these targets are overridden — see [Mode Overrides](#mode-overrides).
 
 ### Module Document Sections
 
@@ -230,19 +215,19 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 
 **Full template (`module.md`) — for core modules:**
 
-| # | Section | Content |
-|---|---------|---------|
-| 1 | **Overview** | Intro + value proposition + architecture role (2-3 paragraphs) |
-| 2 | **Architecture Position** | Mermaid diagram highlighting module position |
-| 3 | **Feature Table** | Features with related APIs |
-| 4 | **File Structure** | File tree + responsibilities |
-| 5 | **Core Workflow** | Mermaid flowchart |
-| 6 | **State Diagram** | ⚡ OPTIONAL — only for stateful modules |
-| 7 | **API Summary** | Overview table + link to api.md (no detailed signatures) |
-| 8 | **Usage Examples** | 1-3 examples (first = Quick Start) |
-| 9 | **Best Practices** | Recommended / avoid patterns |
-| 10 | **Design Decisions** | ⚡ OPTIONAL — only for core modules with significant choices |
-| 11 | **Dependencies & Related Docs** | Dependency diagram + cross-links |
+| # | Section | Content | Lines Target | Diagram |
+|---|---------|---------|-------------|---------|
+| 1 | **Overview** | Intro + value proposition + architecture role | 2-3 paragraphs | — |
+| 2 | **Architecture Position** | Mermaid diagram highlighting module position | — | flowchart TB |
+| 3 | **Feature Table** | Features with related APIs | N features | — |
+| 4 | **File Structure** | File tree + responsibilities | tree | — |
+| 5 | **Core Workflow** | Mermaid flowchart | — | sequenceDiagram |
+| 6 | **State Diagram** | ⚡ OPTIONAL — only for stateful modules | OPTIONAL | stateDiagram-v2 |
+| 7 | **API Summary** | Overview table + link to api.md (no detailed signatures) | table + link | — |
+| 8 | **Usage Examples** | 1-3 examples (first = Quick Start) | 5+ (core) / 1-2 (util) | — |
+| 9 | **Best Practices** | Recommended / avoid patterns | recommended/avoid | — |
+| 10 | **Design Decisions** | ⚡ OPTIONAL — only for core modules with significant choices | OPTIONAL | — |
+| 11 | **Dependencies & Related Docs** | Dependency diagram + cross-links | — | flowchart LR |
 
 **Lightweight template (`module-simple.md`) — for util/config/helper/test modules:**
 
@@ -255,7 +240,7 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 | 5 | **Best Practices** | ⚡ OPTIONAL |
 | 6 | **Related Docs** | Cross-links |
 
-**Template selection**: Before generating each module's documentation, run `node scripts/index.js analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal:
+**Template selection**: Before generating each module's documentation, run `node scripts/index.cjs analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal:
 
 | `docScope` | Use this template | Lines target | Diagrams |
 |---|---|---|---|
@@ -283,7 +268,7 @@ Every code example must:
 - Module docs should link outward to: architecture position, API reference, dependency graph
 - API docs should link back to: parent module, usage examples, type definitions
 
-**Path format rules for "Related Docs" table (Section 6 / Section 11 in templates)**:
+**Path format rules for "Related Docs" table ("Related Docs" in `module-simple.md` / "Dependencies & Related Docs" in `module.md`)**:
 - **Wiki page links**: Use **relative paths** from the current doc's location. E.g., from `modules/badge.md`: `[version]({{ ../api/version.md }})` → resolved to `../api/version.md`
 - **Source file references**: Do NOT put source files (`.ts`, `.js`, etc.) in the Related Docs table. Source files belong in **section footers** with absolute paths: `[version.ts](/src/utils/version.ts#L1)`
 - **Wrong**: `[version.ts](/wiki/utils/version.md)` — mixes wiki path prefix with source file name
@@ -342,7 +327,7 @@ Normalize all paths relative to the project root.
 ### Step 1 — Pre-flight Check
 
 ```bash
-node scripts/index.js analyze-module <path> [--json]
+node scripts/index.cjs analyze-module <path> [--json]
 ```
 
 Read the returned `docScope` and `roleRecommendation`:
@@ -393,19 +378,7 @@ Display a structured report and **await user confirmation before proceeding**:
 - Dependents: N modules depend on this
 
 ### Recommended Sections
-| # | Section | Lines Target | Diagram |
-|---|---------|-------------|---------|
-| 1 | Overview | 2-3 paragraphs | — |
-| 2 | Architecture Position | — | flowchart TB |
-| 3 | Feature Table | N features | — |
-| 4 | File Structure | tree | — |
-| 5 | Core Workflow | — | sequenceDiagram |
-| 6 | State Diagram | OPTIONAL | stateDiagram-v2 |
-| 7 | API Summary | table + link | — |
-| 8 | Usage Examples | 5+ (core) / 1-2 (util) | — |
-| 9 | Best Practices | recommended/avoid | — |
-| 10 | Design Decisions | OPTIONAL | — |
-| 11 | Dependencies | — | flowchart LR |
+(see [Module Document Sections](#module-document-sections) for section list, lines targets, and diagram types)
 
 ---
 Proceed with generation? [yes / no / customize]
@@ -442,8 +415,8 @@ Resume from Step 1 Pre-flight Check, then proceed to generation
 User Input
   │
   ├─ "generate wiki" (no module specified)
-  │    ├─ .nium-wiki does not exist → init → FULL pipeline → Section 1–11
-  │    └─ .nium-wiki exists → FULL pipeline → Section 1–11
+  │    ├─ .nium-wiki does not exist → init → FULL pipeline (Sections 1–9, + Section 10 if multi-language)
+  │    └─ .nium-wiki exists → FULL pipeline (Sections 1–9, + Section 10 if multi-language)
   │
   ├─ "generate wiki for <module>"
   │    ├─ .nium-wiki does not exist → init → MODULE_TARGETED
@@ -456,7 +429,7 @@ User Input
   │    └─ MODULE_TARGETED + force full regeneration
   │
   ├─ "analyze module X"
-  │    └─ Run `node scripts/index.js analyze-module <path> --json` — JSON signals only, no wiki files written
+  │    └─ Run `node scripts/index.cjs analyze-module <path> --json` — JSON signals only, no wiki files written
   │
   └─ "refresh / upgrade wiki" (no module)
        └─ MAINTENANCE → audit → regenerate failing docs
@@ -468,29 +441,29 @@ User Input
 
 ### 1. CLI Commands Quick Reference
 
-> **Execution context**: All `node scripts/index.js` commands below are run from the **skill root directory**
+> **Execution context**: All `node scripts/index.cjs` commands below are run from the **skill root directory**
 > (the directory containing `SKILL.md`), NOT the user's project root. The working directory when
 > executing a skill is always the skill root — this is the industry-standard convention across all
 > Coding Agents (Claude Code, Trae, Cursor, CodeGPT, 通义灵码, etc.).
 >
 > Scripts inside `skills/` are portable: the same skill can be installed globally
 > (`<AGENT_HOME>/skills/nium-wiki/`) or project-locally (`./skills/nium-wiki/`) — the relative path
-> `scripts/index.js` always resolves correctly.
+> `scripts/index.cjs` always resolves correctly.
 
 ```bash
-node scripts/index.js init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de); run from project root
-node scripts/index.js analyze [path]             # Analyze project structure
-node scripts/index.js analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
-node scripts/index.js incremental [path]         # Run incremental pipeline: diff → deps → doc-index → affected docs; run from project root
-node scripts/index.js diff-index [path]          # Detect file changes (--no-update to skip hash write); run from project root
-node scripts/index.js build-index [path]          # Build source ↔ doc mapping index; run from project root
-node scripts/index.js build-deps [path]           # Build import/require dependency graph; run from project root
-node scripts/index.js generate-sidebar [.nium-wiki] [--all]  # Generate sidebar.json for all language directories
-node scripts/index.js audit-docs [.nium-wiki] [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
-node scripts/index.js serve [wiki-path]          # Start docsify server
+node scripts/index.cjs init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de); run from project root
+node scripts/index.cjs analyze [path]             # Analyze project structure
+node scripts/index.cjs analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
+node scripts/index.cjs incremental [path]         # Run incremental pipeline: diff → deps → doc-index → affected docs; run from project root
+node scripts/index.cjs diff-index [path]          # Detect file changes (--no-update to skip hash write); run from project root
+node scripts/index.cjs build-index [path]          # Build source ↔ doc mapping index; run from project root
+node scripts/index.cjs build-deps [path]           # Build import/require dependency graph; run from project root
+node scripts/index.cjs generate-sidebar [.nium-wiki] [--all]  # Generate sidebar.json for all language directories
+node scripts/index.cjs audit-docs [.nium-wiki] [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
+node scripts/index.cjs serve [wiki-path]          # Start docsify server
 ```
 
-For detailed usage, see `node scripts/index.js --help`
+For detailed usage, see `node scripts/index.cjs --help`
 
 > **⚠️ IMPORTANT**: All commands that take `[path]` (incremental, diff-index, build-index, build-deps, etc.)
 > **must be run from the project root directory**, or pass the absolute/relative path to the project root.
@@ -516,19 +489,19 @@ Before running any CLI commands or generating any documentation:
 
 | Scenario | Action |
 |----------|--------|
-| Config exists, user wants to add a secondary language (e.g. config=`en`, user wants to also generate `zh`) | Run `node scripts/index.js init [path] --lang zh` — appends `zh` as a secondary language to config |
-| User wants to change the primary language (e.g. config=`en`, user wants `zh` as primary) | Run `node scripts/index.js init [path] --lang zh --force` — overwrites primary language to `zh` |
-| User wants to generate docs in a language already in config | No config change needed — run `generate-toc --lang <code>` directly |
+| Config exists, user wants to add a secondary language (e.g. config=`en`, user wants to also generate `zh`) | Run `node scripts/index.cjs init [path] --lang zh` — appends `zh` as a secondary language to config |
+| User wants to change the primary language (e.g. config=`en`, user wants `zh` as primary) | Run `node scripts/index.cjs init [path] --lang zh --force` — overwrites primary language to `zh` |
+| User wants to generate docs in a language already in config | No config change needed — run `node scripts/index.cjs incremental [path]` directly |
 
 **Why**: Direct file edits to `config.json` bypass the CLI's validation and can corrupt the JSON structure. Always go through the CLI.
 
-### 4. Language Configuration
+### 3. Language Configuration
 
 Read `.nium-wiki/config.json` and extract the `language` setting.
 Format is slash-separated: the first language is the **primary language** (e.g. `zh`, `en`, `zh/en`).
 
 - Generate **all primary documentation** in the primary language to `.nium-wiki/wiki/`.
-- If secondary languages are configured (e.g. `zh/en` means primary=zh, secondary=en), after primary docs are written, translate all wiki documents into `wiki_{lang}/` directories (e.g. `.nium-wiki/wiki_en/`). See **Step 12** for details.
+- If secondary languages are configured (e.g. `zh/en` means primary=zh, secondary=en), after primary docs are written, translate all wiki documents into `wiki_{lang}/` directories (e.g. `.nium-wiki/wiki_en/`). See **Section 10** for details.
 
 > **Convention**: `wiki/` = primary language, `wiki_{lang}/` = secondary language. The translated directory must mirror the exact same structure and filenames as `wiki/`.
 
@@ -536,9 +509,9 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 > - If `language` is `en`: headings should be `## Architecture Preview`, NOT `## Architecture Preview / 架构预览`
 > - If `language` is `zh`: headings should be `## 架构预览`, NOT `## Architecture Preview / 架构预览`
 
-### 5. Project Analysis (Deep)
+### 4. Project Analysis (Deep)
 
-Run `node scripts/index.js analyze .` or analyze manually:
+Run `node scripts/index.cjs analyze .` or analyze manually:
 
 1. **Identify tech stack**: Check dependency manifests (e.g. package.json, requirements.txt, go.mod, Cargo.toml, pom.xml, etc.)
 2. **Find entry points**: Locate main source files (e.g. src/index.ts, main.py, main.go, main.rs, src/main/java/App.java, etc.)
@@ -547,7 +520,7 @@ Run `node scripts/index.js analyze .` or analyze manually:
 
 Save structure to `cache/structure.json`.
 
-### 6. Deep Code Analysis (CRITICAL)
+### 5. Deep Code Analysis (CRITICAL)
 
 **IMPORTANT**: For every module, read the actual source code — do not rely on file names or directory structure alone:
 
@@ -563,12 +536,12 @@ Save structure to `cache/structure.json`.
 4. **Map relationships**: Module dependencies, call graphs, data flow
 5. **Flag complexity hotspots**: Functions with deep nesting (> 4 levels), high branching (> 10 conditions), or excessive length (> 100 LOC). Document these in module docs with logic explanations and refactoring suggestions.
 
-### 7. Change Detection
+### 6. Change Detection
 
 Use the **automated incremental pipeline** to detect changes and compute the precise list of affected docs in one step:
 
 ```bash
-node scripts/index.js incremental . [--no-commit] [-v]  # run from project root
+node scripts/index.cjs incremental . [--no-commit] [-v]  # run from project root
 ```
 
 This runs the full pipeline: `diff-index` → `build-deps` → `build-index` → transitive-impact → doc-dep analysis. It outputs:
@@ -581,31 +554,24 @@ This runs the full pipeline: `diff-index` → `build-deps` → `build-index` →
 
 > **IMPORTANT**: Always run `incremental` before generating, not `diff-index` alone.
 > `diff-index` only detects source changes — it does NOT map them to wiki docs.
-> After `incremental` completes, always check i18n sync status (see **Step 12**) before declaring the update done.
+> After `incremental` completes, always check i18n sync status (see **Section 10**) before declaring the update done.
 
-### 8. Target Docs (resolved by the pipeline above)
+### 7. Target Docs (resolved by the pipeline above)
 
-The `incremental` command in Step 5 already resolves this. Each affected doc includes:
+The `incremental` command in Section 6 already resolves this. Each affected doc includes:
 - `docPath`: relative wiki path (e.g. `modules/core/source-index.md`)
 - `reason`: why it needs updating
 - `triggeredBy`: source files that triggered the update
 
 Manual fallback (if pipeline not available): Read `.nium-wiki/cache/doc-index.json` → `sourceToDoc` field. If a changed source file has no entry, infer by naming convention: `src/fooBar.ts` → `modules/foo-bar.md`, and nested paths: `src/core/analyzeProject.ts` → `modules/core/analyze-project.md`.
 
-### 9. Content Generation
+### 8. Content Generation
 
-> **🔴 MANDATORY: Language from config.json**
->
-> Before generating ANY documentation content, you MUST read `.nium-wiki/config.json` and extract the `language` field.
-> Use this language for **ALL** documentation in `wiki/` — do NOT infer language from source code comments, README, or user conversation.
-> See **Step 4** for supported language codes and output conventions.
->
-> **Wrong**: "Source code is in English, so I'll generate English docs"
-> **Correct**: "config.json says `language: "zh"`, so I generate Chinese docs"
+> **🔴 Language**: use `language` from `.nium-wiki/config.json` — see Section 3. Do NOT infer from source code or conversation.
 
 Generate content adhering to the **quality gate** defined above:
 
-#### 9.1 Template Selection Rules
+#### 8.1 Template Selection Rules
 
 Not all templates are needed for every project. Apply these rules:
 
@@ -618,29 +584,29 @@ Not all templates are needed for every project. Apply these rules:
 | `api.md` | project exports programmatic APIs (functions/classes/types) |
 | `doc-map.md` | module count >= 5 |
 
-#### 9.2 Homepage (`index.md`)
+#### 8.2 Homepage (`index.md`)
 **Template**: Read `templates/index.md` for full structure.
 
-#### 9.3 Architecture Doc (`architecture.md`)
+#### 8.3 Architecture Doc (`architecture.md`)
 **Template**: Read `templates/architecture.md` for full structure.
 
-#### 9.4 Module Docs (`modules/<name>.md`)
+#### 8.4 Module Docs (`modules/<name>.md`)
 **Templates**: Read `templates/module.md` (core) or `templates/module-simple.md` (util/config/helper/test).
 - **Key rule**: Detailed API signatures and type definitions belong exclusively in api.md. Module docs only contain an API overview table with a link.
 
-#### 9.5 API Docs (`api/<name>.md`)
+#### 8.5 API Docs (`api/<name>.md`)
 **Template**: Read `templates/api.md` for full structure.
 - Single source of truth for all API signatures and type definitions.
 - Mark `@deprecated` APIs with migration guidance (what to use instead).
 - Include parameter constraints where applicable (e.g. "must not be empty", "range 0-100").
 
-#### 9.6 Getting Started (`getting-started.md`)
+#### 8.6 Getting Started (`getting-started.md`)
 **Template**: Read `templates/getting-started.md` for full structure.
 
-#### 9.7 Doc Map (`doc-map.md`)
+#### 8.7 Doc Map (`doc-map.md`)
 **Template**: Read `templates/doc-map.md` for full structure.
 
-#### 9.8 Source Links
+#### 8.8 Source Links
 
 Attach navigable source links next to documented symbols:
 
@@ -648,16 +614,16 @@ Attach navigable source links next to documented symbols:
 ### `functionName` [📄](/src/file.ts#L42)
 ```
 
-### 11. Save
+### 9. Save
 
 - Write wiki files to `.nium-wiki/wiki/`
 - Sanitize link paths and build indexes **after** wiki files are written:
 
 ```bash
-node scripts/index.js sanitize-links .  # run from project root
-node scripts/index.js build-index .       # run from project root
-node scripts/index.js build-deps .       # run from project root
-node scripts/index.js diff-index .      # run from project root (--no-update to skip hash write)
+node scripts/index.cjs sanitize-links .  # run from project root
+node scripts/index.cjs build-index .       # run from project root
+node scripts/index.cjs build-deps .       # run from project root
+node scripts/index.cjs diff-index .      # run from project root (--no-update to skip hash write)
 ```
 
 > `sanitize-links` scans all wiki `.md` files and converts any `file://` absolute paths to project-root-relative paths. **MUST** run before `build-index`.
@@ -669,27 +635,27 @@ node scripts/index.js diff-index .      # run from project root (--no-update to 
 - 🔴 **MANDATORY** — Generate sidebar:
 
 ```bash
-node scripts/index.js generate-sidebar .nium-wiki --all
+node scripts/index.cjs generate-sidebar .nium-wiki --all
 ```
 
 > This generates `sidebar.json` for all language directories. It is **idempotent** — if `sidebar.json` already exists it will be skipped. If a legacy `_sidebar.md` exists it will be migrated automatically. **This step is mandatory after every wiki generation** — the preview server and all modern tooling depend on `sidebar.json`. Do NOT skip it.
 
-### 12. Multi-language Translation
+### 10. Multi-language Translation
 
 > **Applies to both full generation and incremental updates.** Every time `wiki/` is modified, secondary language files in `wiki_{lang}/` that correspond to changed docs must be kept in sync — do not leave them stale.
 >
 > **Skip this step if `language` contains only one language.**
 
-#### 12.1 Build Translation Task List
+#### 10.1 Build Translation Task List
 
-Run `node scripts/index.js i18n status .nium-wiki` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
+Run `node scripts/index.cjs i18n status .nium-wiki` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
 
 > **Incremental mode**: If this is a partial update (incremental pipeline detected changes), only translate files that are `Outdated` or `Missing` — do NOT re-translate all `Synced` files.
 > **Full generation mode**: Translate all `Missing` files (`Outdated` may not exist yet since memory has not been populated).**
 
-#### 12.2 Translate Files One by One
+#### 10.2 Translate Files One by One
 
 **🔴 MANDATORY: Process EVERY file in the checklist sequentially.**
 
@@ -704,14 +670,14 @@ After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 
 > **Batching rule**: If the file count exceeds 10, translate in batches of 5. After each batch, report progress and continue immediately — do NOT stop or ask the user unless you hit a context limit. If you must stop, clearly list the remaining untranslated files so the user can say "continue" to resume.
 
-#### 12.3 Finalize
+#### 10.3 Finalize
 
 After ALL files are translated:
 ```bash
-node scripts/index.js i18n sync-memory .nium-wiki
+node scripts/index.cjs i18n sync-memory .nium-wiki
 ```
 
-Run `node scripts/index.js i18n status .nium-wiki` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
+Run `node scripts/index.cjs i18n status .nium-wiki` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
 
 **Delete rule**: When deleting any file from `wiki/` (e.g. because the source file was deleted), you **MUST** also delete the corresponding file from ALL `wiki_{lang}/` directories.
 
@@ -793,7 +759,8 @@ Change type → Minimum doc impact
 
 1. Function logic changed (signature unchanged)
    → Update only that function's description paragraph
-   → Code example only if the behavior changed
+   → Code example only if the behavior changed in a user-visible way (callers must change)
+   → If change only affects internal call chains, not external callers: update version footer only
    → Do NOT rewrite other functions' descriptions
 
 2. New exported function added
@@ -810,42 +777,7 @@ Change type → Minimum doc impact
    → Do NOT restructure the entire section
 ```
 
-#### Decision Checklist — What Changed vs What to Update
-
-Before editing, run through this checklist to determine the minimum scope:
-
-- [ ] **Function signature changed?** (params, return type, or name)
-    → Update API summary table row + add new signature to examples
-
-- [ ] **Function behavior changed in a user-visible way?** (callers must change how they use it)
-    → Update that function's description paragraph + examples
-
-    - [ ] Behavior change only affects internal call chains, not external callers?
-        → Update version footer only — do NOT rewrite descriptions or examples
-
-- [ ] **Only internal implementation changed?** (helper functions, variable names, refactor)
-    → Update version footer only — do NOT rewrite descriptions or examples
-
-### Principle 3 — Match Degree Evaluation Guide
-
-When evaluating match degree, use these concrete signals:
-
-**High match (≥ 80%) — signals:**
-- Changed code is internal implementation detail (comment, variable rename, refactor)
-- Doc describes concepts/topics that the change does not touch
-- Function signature unchanged; only body logic shifted
-
-**Medium match (40–80%) — signals:**
-- Changed code affects one function's behavior → that function's section needs update
-- New export added → append to API table, leave other sections intact
-- File added/removed → update file structure tree only
-
-**Low match (< 40%) — signals:**
-- Function renamed or signature changed → rewrite that function's section
-- Module role changed (e.g. core → utility) → full regeneration needed
-- Multiple sections invalidated → regenerate the whole doc
-
-### Principle 4 — When in Doubt, Don't Touch
+### Principle 3 — When in Doubt, Don't Touch
 
 A common failure mode is rewriting a correct paragraph "for better wording" — this creates a large diff with no factual improvement.
 
@@ -930,7 +862,7 @@ Infer business domains from the project's directory structure, package boundarie
 |------|-------------|
 | `_index.md` | Domain overview, architecture diagram, sub-module list |
 | Sub-domain dirs | Related modules grouped by function |
-| Each document | **400+ lines, 5+ code examples** |
+| Each document | **Depth scales with module role — see [Complexity-Scaled Quality Targets](#-mandatory-complexity-scaled-quality-targets)** |
 
 ---
 
@@ -941,7 +873,7 @@ When module count > 10, source files > 50, or LOC > 10,000, switch to batch mode
 1. **Prioritize modules** — entry points (weight 5) > dependents (4) > has docs (3) > code size (2) > recently modified (1)
 2. **Generate 1-2 modules per batch** — depth scales with complexity
 3. **Track progress** in `cache/progress.json` — record completed/pending modules and current batch number
-4. **After each batch** — run `node scripts/index.js audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
+4. **After each batch** — run `node scripts/index.cjs audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
    - `"continue"` — next batch
    - `"audit docs"` — re-run validation
    - `"regenerate <module>"` — redo a specific module
@@ -960,10 +892,10 @@ When existing wiki docs are outdated or below quality gate, use one of these str
 | `incremental_upgrade` | Many modules, want to keep existing content | "upgrade wiki" |
 | `targeted_upgrade` | Only specific modules need attention | "upgrade \<module\> docs" |
 
-Execution: scan existing docs with `node scripts/index.js audit-docs .nium-wiki --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
+Execution: scan existing docs with `node scripts/index.cjs audit-docs .nium-wiki --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
 
 **Version footer** — append to every generated document:
-`*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/node scripts/index.js) | {{ GENERATED_AT }}*`
+`*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/nium-wiki) | {{ GENERATED_AT }}*`
 
 ---
 
@@ -972,16 +904,16 @@ Execution: scan existing docs with `node scripts/index.js audit-docs .nium-wiki 
 > **Applies after every wiki generation**: full pipeline, module-targeted, incremental, or surgical patch.
 > This checklist is the **last step of every execution path**. Do not skip any item.
 
-- [ ] `node scripts/index.js generate-sidebar .nium-wiki --all`
+- [ ] `node scripts/index.cjs generate-sidebar .nium-wiki --all`
   → Generates `sidebar.json` for all language directories. Idempotent — safe to run multiple times.
   → Migrates legacy `_sidebar.md` to `sidebar.json` automatically if encountered.
   → **⚠️ Do NOT skip**: the preview server and modern tooling depend on `sidebar.json`.
 
-- [ ] `node scripts/index.js i18n sync-memory .nium-wiki` (if multi-language)
+- [ ] `node scripts/index.cjs i18n sync-memory .nium-wiki` (if multi-language)
   → Updates translation memory so subsequent runs show accurate sync status.
 
-- [ ] `node scripts/index.js audit-docs .nium-wiki --mermaid-strict` (full generation only)
+- [ ] `node scripts/index.cjs audit-docs .nium-wiki --mermaid-strict` (full generation only)
   → Validates all Mermaid diagrams. Mermaid errors block the run — fix them before declaring done.
 
 > **Rule**: These finalization steps must run **after** all wiki content is written and **after** all translation files are updated. They are not optional cleanup — they are part of the generation contract.
-(read version from `skills/node scripts/index.js/scripts/version.json` — `version` field)
+(read version from `scripts/version.json` — `version` field)

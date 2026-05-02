@@ -1,6 +1,6 @@
 {
   "name": "nium-wiki",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Professional-grade project Wiki generator (aligned with the Karpathy LLM Wiki compile-not-retrieve pattern), powered by AI coding tools",
   "main": "dist/serve.js",
   "bin": {

@@ -22,6 +22,7 @@ import { loadDependencyGraph } from '../core/buildDeps';
 
 export type ModuleRole = 'core' | 'api' | 'utility' | 'ui' | 'test' | 'config' | 'unknown';
 export type TemplateType = 'module.md' | 'module-simple.md';
+export type DocScope = 'core' | 'overview' | '_index';
 
 // ─── Output Structure ───────────────────────────────────────────────
 // ─── 输出结构 ───────────────────────────────────────────────
@@ -74,6 +75,14 @@ export interface ModuleAnalysis {
   name: string;
   /** Path relative to project root / 相对项目根的路径 */
   path: string;
+  /**
+   * Document scope — primary signal for template selection:
+   * - 'core': use module.md (11-section, 400+ lines, 2+ diagrams)
+   * - 'overview': use overview.md (5-section, 80-150 lines)
+   * - '_index': generate _index.md only (30-50 lines, no diagrams)
+   * 文档范围 — 模板选择的主要信号
+   */
+  docScope: DocScope;
   /** Quantitative signals (from code) / 量化信号（代码负责） */
   signals: ModuleSignals;
   /** Template recommendation (overridable) / 模板推荐（可覆盖） */
@@ -137,35 +146,42 @@ const EXPORT_PATTERNS: Record<string, RegExp[]> = {
 
 /**
  * 提取模块中所有公开导出（按语言检测文件）
+ * modulePath 可以是目录或单个源文件
  */
 function extractExports(modulePath: string): { count: number; samples: string[] } {
-  const langId = languageHandlerManager.detectLanguageFromFile(
-    fs.readdirSync(modulePath).find(f => !f.startsWith('.')) || '',
-  ) || 'javascript';
-
-  const patterns = EXPORT_PATTERNS[langId] || EXPORT_PATTERNS.javascript;
   const exports = new Set<string>();
   const MAX_SAMPLES = 20;
 
-  try {
-    const files = fs.readdirSync(modulePath, { withFileTypes: true });
-    for (const entry of files) {
-      if (!entry.isFile()) continue;
-      const lang = languageHandlerManager.detectLanguageFromFile(entry.name);
-      const langPatterns = lang ? (EXPORT_PATTERNS[lang] || EXPORT_PATTERNS.javascript) : patterns;
-      try {
-        const content = fs.readFileSync(path.join(modulePath, entry.name), 'utf-8');
-        for (const pattern of langPatterns) {
-          pattern.lastIndex = 0;
-          let match: RegExpExecArray | null;
-          while ((match = pattern.exec(content)) !== null) {
-            exports.add(match[1] || match[2] || match[3]);
-            if (exports.size >= MAX_SAMPLES) break;
-          }
+  const processFile = (filePath: string): void => {
+    const lang = languageHandlerManager.detectLanguageFromFile(path.basename(filePath));
+    if (!lang) return;
+    const patterns = EXPORT_PATTERNS[lang] || EXPORT_PATTERNS.javascript;
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      for (const pattern of patterns) {
+        pattern.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = pattern.exec(content)) !== null) {
+          exports.add(match[1] || match[2] || match[3]);
+          if (exports.size >= MAX_SAMPLES) return;
         }
-      } catch { /* skip unreadable files */ }
+      }
+    } catch { /* skip unreadable files */ }
+  };
+
+  try {
+    const stat = fs.statSync(modulePath);
+    if (stat.isFile()) {
+      processFile(modulePath);
+    } else {
+      const files = fs.readdirSync(modulePath, { withFileTypes: true });
+      for (const entry of files) {
+        if (!entry.isFile()) continue;
+        processFile(path.join(modulePath, entry.name));
+        if (exports.size >= MAX_SAMPLES) break;
+      }
     }
-  } catch { /* skip unreadable dirs */ }
+  } catch { /* skip unreadable paths */ }
 
   return { count: exports.size, samples: [...exports].slice(0, 10) };
 }
@@ -176,6 +192,7 @@ function extractExports(modulePath: string): { count: number; samples: string[] 
 /**
  * 计算模块复杂度评分（0-100）
  * 综合：文件数 + 行数 + 嵌套深度 + 导出数
+ * modulePath 可以是目录或单个源文件
  */
 function calculateComplexity(
   modulePath: string,
@@ -185,27 +202,37 @@ function calculateComplexity(
   let maxDepth = 0;
   let fileCount = 0;
 
+  const processFile = (filePath: string, depth: number): void => {
+    fileCount++;
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n').length;
+      totalLines += lines;
+      const indentLines = content.split('\n').filter(l => l.startsWith('  ') || l.startsWith('\t'));
+      maxDepth = Math.max(maxDepth, depth + Math.min(Math.floor(indentLines.length / 20), 5));
+    } catch { /* skip */ }
+  };
+
   try {
-    const walk = (dir: string, depth = 0): void => {
-      maxDepth = Math.max(maxDepth, depth);
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          walk(path.join(dir, entry.name), depth + 1);
-        } else if (entry.isFile() && languageHandlerManager.detectLanguageFromFile(entry.name)) {
-          fileCount++;
-          try {
-            const content = fs.readFileSync(path.join(dir, entry.name), 'utf-8');
-            const lines = content.split('\n').length;
-            totalLines += lines;
-            // 简单嵌套估计：缩进层级
-            const indentLines = content.split('\n').filter(l => l.startsWith('  ') || l.startsWith('\t'));
-            maxDepth = Math.max(maxDepth, depth + Math.min(Math.floor(indentLines.length / 20), 5));
-          } catch { /* skip */ }
-        }
+    const stat = fs.statSync(modulePath);
+    if (stat.isFile()) {
+      if (languageHandlerManager.detectLanguageFromFile(path.basename(modulePath))) {
+        processFile(modulePath, 0);
       }
-    };
-    walk(modulePath);
+    } else {
+      const walk = (dir: string, depth = 0): void => {
+        maxDepth = Math.max(maxDepth, depth);
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory()) {
+            walk(path.join(dir, entry.name), depth + 1);
+          } else if (entry.isFile() && languageHandlerManager.detectLanguageFromFile(entry.name)) {
+            processFile(path.join(dir, entry.name), depth);
+          }
+        }
+      };
+      walk(modulePath);
+    }
   } catch { /* skip */ }
 
   // 归一化评分
@@ -360,20 +387,38 @@ function recommendRole(
 
 /**
  * 基于复杂度推荐模板（结果标记为可覆盖）
+ * Role-based overrides take priority over quantitative thresholds to stay consistent with deriveDocScope.
  */
 function recommendTemplate(complexity: number, exportCount: number, role: ModuleRole): TemplateRecommendation {
-  // 语义规则（模型可覆盖的信号）
-  const semanticOverrides: Record<string, { template: TemplateType; reason: string }> = {
-    test: { template: 'module-simple.md', reason: 'Test modules need concise documentation' },
-    config: { template: 'module-simple.md', reason: 'Config modules typically have simple structure' },
-    utility: { template: 'module-simple.md', reason: 'Utility modules benefit from concise docs' },
-    ui: { template: 'module.md', reason: 'UI components need detailed props/API documentation' },
-    api: { template: 'module.md', reason: 'API modules need detailed endpoint documentation' },
-    core: { template: 'module.md', reason: 'Core modules require comprehensive documentation' },
-    unknown: { template: 'module.md', reason: 'Default to full template when role is unclear' },
+  // Role-based rules (higher priority — must stay consistent with deriveDocScope)
+  const roleToTemplate: Record<ModuleRole, TemplateType> = {
+    core:    'module.md',
+    api:     'module.md',
+    ui:      'module.md',
+    test:    'module-simple.md',
+    config:  'module-simple.md',
+    utility: 'module-simple.md',
+    unknown: 'module.md',
+  };
+  const roleReasons: Record<ModuleRole, string> = {
+    core:    'Core modules require comprehensive documentation',
+    api:     'API modules need detailed endpoint documentation',
+    ui:      'UI components need detailed props/API documentation',
+    test:    'Test modules need concise documentation',
+    config:  'Config modules typically have simple structure',
+    utility: 'Utility modules benefit from concise docs',
+    unknown: 'Default to full template when role is unclear',
   };
 
-  // 量化阈值
+  if (role !== 'unknown') {
+    return {
+      template: roleToTemplate[role],
+      reason: roleReasons[role],
+      basis: { complexityScore: complexity, exportCount, fileCount: 0 },
+    };
+  }
+
+  // Quantitative fallback for unknown role
   if (complexity >= 50 || exportCount >= 10) {
     return {
       template: 'module.md',
@@ -390,12 +435,43 @@ function recommendTemplate(complexity: number, exportCount: number, role: Module
     };
   }
 
-  const override = semanticOverrides[role];
   return {
-    template: override?.template || 'module.md',
-    reason: override?.reason || 'Default template based on role',
+    template: 'module.md',
+    reason: 'Default to full template when role is unclear',
     basis: { complexityScore: complexity, exportCount, fileCount: 0 },
   };
+}
+
+// ─── DocScope Derivation ──────────────────────────────────────────────────
+// ─── 文档范围推导 ────────────────────────────────────────────
+
+/**
+ * Derive docScope from role + signals.
+ * This is the primary signal the model uses to pick a template.
+ * 从角色和信号推导文档范围，作为模型选择模板的主要信号。
+ *
+ * Mapping:
+ *   role is core/api/ui OR complexity >= 50 OR exportCount >= 10 OR incomingDeps >= 5
+ *                                         → 'core'   (module.md, 400+ lines)
+ *   moduleName is '_index'                → '_index'  (30-50 lines, no diagrams)
+ *   everything else                       → 'overview' (overview.md, 80-150 lines)
+ */
+function deriveDocScope(role: ModuleRole, signals: ModuleSignals, moduleName: string): DocScope {
+  // _index targets: directory-level overview files only (not project entry index.ts)
+  if (moduleName === '_index') return '_index';
+
+  if (
+    role === 'core' ||
+    role === 'api' ||
+    role === 'ui' ||
+    signals.complexityScore >= 50 ||
+    signals.exportCount >= 10 ||
+    signals.incomingDeps >= 5
+  ) {
+    return 'core';
+  }
+
+  return 'overview';
 }
 
 // ─── Semantic Hint Generation ─────────────────────────────────────────────
@@ -498,12 +574,16 @@ export function analyzeModule(modulePath: string, projectRoot: string): ModuleAn
   // Template recommendation (overridable) / 模板推荐（可覆盖）
   const templateRec = recommendTemplate(score, exports.count, roleRec.role);
 
+  // DocScope — primary signal for template selection / 文档范围 — 模板选择的主要信号
+  const docScope = deriveDocScope(roleRec.role, signals, name);
+
   // Semantic hints / 语义提示
   const semanticHints = generateSemanticHints(name, signals);
 
   return {
     name,
     path: relPath,
+    docScope,
     signals,
     templateRecommendation: templateRec,
     roleRecommendation: roleRec,
@@ -555,6 +635,10 @@ export function analyzeAllModules(projectRoot: string): BatchModuleAnalysis {
 
 function countModuleFiles(modulePath: string): number {
   try {
+    const stat = fs.statSync(modulePath);
+    if (stat.isFile()) {
+      return languageHandlerManager.detectLanguageFromFile(path.basename(modulePath)) ? 1 : 0;
+    }
     const walk = (dir: string): number => {
       let count = 0;
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -582,6 +666,7 @@ export function formatModuleAnalysis(analysis: ModuleAnalysis): string {
   const lines: string[] = [];
   lines.push(`## Module: ${analysis.name}`);
   lines.push(`**Path**: \`${analysis.path}\``);
+  lines.push(`**docScope**: \`${analysis.docScope}\``);
   lines.push('');
   lines.push('### Quantitative Signals (from code analysis)');
   lines.push(`| Signal | Value |`);

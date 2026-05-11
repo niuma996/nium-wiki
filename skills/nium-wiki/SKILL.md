@@ -240,7 +240,7 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 | 5 | **Best Practices** | ⚡ OPTIONAL |
 | 6 | **Related Docs** | Cross-links |
 
-**Template selection**: Before generating each module's documentation, run `node scripts/index.cjs analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal:
+**Template selection**: Before generating each module's documentation, run `node scripts/index.cjs analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal — it appears at the top of the output as `**docScope**: \`core\`` (text format) or as `"docScope": "core"` (JSON format with `--json`):
 
 | `docScope` | Use this template | Lines target | Diagrams |
 |---|---|---|---|
@@ -248,7 +248,7 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 | `overview` | `overview.md` (5-section) | 80-150 | optional |
 | `_index` | `_index.md` only | 30-50 | none |
 
-The `templateRecommendation` and `roleRecommendation` are based on quantifiable metrics but are **overrideable**: your semantic understanding of the module's business role takes precedence.
+The `templateRecommendation` and `roleRecommendation` fields are also present in the output and are based on quantifiable metrics but are **overrideable**: your semantic understanding of the module's business role takes precedence.
 
 > Code provides signals. You make the final decision.
 
@@ -417,6 +417,11 @@ User Input
   ├─ "generate wiki" (no module specified)
   │    ├─ .nium-wiki does not exist → init → FULL pipeline (Sections 1–9, + Section 10 if multi-language)
   │    └─ .nium-wiki exists → FULL pipeline (Sections 1–9, + Section 10 if multi-language)
+  │         │
+  │         └─ After Section 4 (Project Analysis): check project size
+  │              ├─ module count > 10 OR source files > 50 OR LOC > 10,000
+  │              │    └─ Switch to BATCH MODE (see "Progressive Scanning for Large Projects")
+  │              └─ otherwise → continue full pipeline normally
   │
   ├─ "generate wiki for <module>"
   │    ├─ .nium-wiki does not exist → init → MODULE_TARGETED

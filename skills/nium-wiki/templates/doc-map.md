@@ -8,9 +8,9 @@
 
 ---
 
-# Documentation Map / 文档地图
+# Documentation Map <!-- / 文档地图 -->
 
-## Document Relationship Diagram / 文档关系图
+## Document Relationship Diagram <!-- / 文档关系图 -->
 
 <!--
   MANDATORY: Mermaid flowchart showing document relationships.
@@ -46,7 +46,7 @@ flowchart TB
     {{ DOMAIN_2_MOD_1 }} --> {{ API_2 }}
 ```
 
-## Recommended Reading Path / 推荐阅读路径
+## Recommended Reading Path <!-- / 推荐阅读路径 -->
 
 <!--
   A single general-purpose reading path for most readers.
@@ -59,7 +59,7 @@ flowchart TB
 2. [Architecture](architecture.md) — {{ ARCH_WHY }}
 3. [{{ FIRST_DOMAIN }}]({{ FIRST_DOMAIN_PATH }}/_index.md) — {{ FIRST_DOMAIN_WHY }}
 
-## Complete Document Index / 完整文档索引
+## Complete Document Index <!-- / 完整文档索引 -->
 
 <!--
   Full index of all documents.
@@ -76,7 +76,7 @@ flowchart TB
 | {{ MODULE_2 }} | [{{ MODULE_2_PATH }}]({{ MODULE_2_PATH }}) | {{ MODULE_2_DESC }} | {{ DOMAIN_2_LABEL }} |
 | {{ API_1 }} | [{{ API_1_PATH }}]({{ API_1_PATH }}) | {{ API_1_DESC }} | API |
 
-## Related Documents / 相关文档
+## Related Documents <!-- / 相关文档 -->
 
 - [Homepage](index.md)
 - [Architecture](architecture.md)

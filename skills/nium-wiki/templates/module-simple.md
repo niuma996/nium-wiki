@@ -12,7 +12,7 @@
 
 # {{ MODULE_NAME }}
 
-## 1. Module Overview / 模块概述
+## 1. Module Overview <!-- / 模块概述 -->
 
 <!--
   1 paragraph: what the module does and its role in the system.
@@ -23,7 +23,7 @@
 **Section sources**
 - [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }})
 
-## 2. API Summary / API 概览
+## 2. API Summary <!-- / API 概览 -->
 
 <!--
   API overview table. Detailed docs in api.md.
@@ -36,19 +36,19 @@
 
 > Full API reference: [{{ MODULE_NAME }} API](../api/{{ MODULE_SLUG }}.md)
 
-## 3. Usage Examples / 使用示例
+## 3. Usage Examples <!-- / 使用示例 -->
 
 <!--
   1-2 examples.
 -->
 
-### Quick Start / 快速开始
+### Quick Start <!-- / 快速开始 -->
 
 ```{{ LANGUAGE }}
 {{ QUICK_START_CODE }}
 ```
 
-## 4. File Structure / 文件结构
+## 4. File Structure <!-- / 文件结构 -->
 
 <!--
   File tree with responsibility descriptions.
@@ -60,7 +60,7 @@
 └── {{ FILE_2 }}        # {{ FILE_2_RESPONSIBILITY }}
 ```
 
-## 5. Best Practices / 最佳实践
+## 5. Best Practices <!-- / 最佳实践 -->
 
 <!--
   OPTIONAL: Include if there are notable patterns to follow or avoid.
@@ -68,7 +68,7 @@
 
 - {{ RECOMMENDED_1 }}
 
-## 6. Related Docs / 相关文档
+## 6. Related Docs <!-- / 相关文档 -->
 
 | Document | Relationship |
 |----------|-------------|

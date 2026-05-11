@@ -13,7 +13,7 @@
 
 # {{ MODULE_NAME }}
 
-## 1. Overview / 概述
+## 1. Overview <!-- / 概述 -->
 
 <!--
   1-2 paragraphs: what the module does and why it exists.
@@ -27,7 +27,7 @@
 **Section sources**
 - [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }})
 
-## 2. File Structure / 文件结构
+## 2. File Structure <!-- / 文件结构 -->
 
 <!--
   File tree with brief responsibility for each file.
@@ -41,7 +41,7 @@
 └── {{ FILE_N }}        # {{ FILE_N_RESPONSIBILITY }}
 ```
 
-## 3. API Summary / API 概览
+## 3. API Summary <!-- / API 概览 -->
 
 <!--
   Brief overview table linking to full API reference.
@@ -55,7 +55,7 @@
 
 > Full API reference: [{{ MODULE_NAME }} API](../api/{{ MODULE_SLUG }}.md)
 
-## 4. Typical Usage / 典型用法
+## 4. Typical Usage <!-- / 典型用法 -->
 
 <!--
   One runnable example only.
@@ -67,7 +67,7 @@
 {{ USAGE_CODE }}
 ```
 
-## 5. Related Docs / 相关文档
+## 5. Related Docs <!-- / 相关文档 -->
 
 | Document | Relationship |
 |----------|-------------|

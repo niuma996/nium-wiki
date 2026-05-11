@@ -25,7 +25,7 @@
 
 {{ DETAILED_INTRODUCTION_PARAGRAPH_3 }}
 
-## Architecture Preview / 架构预览
+## Architecture Preview <!-- / 架构预览 -->
 
 ```mermaid
 flowchart TB
@@ -41,7 +41,7 @@ flowchart TB
     {{ COMPONENT_B }} --> {{ COMPONENT_D }}
 ```
 
-## Documentation Navigation / 文档导航
+## Documentation Navigation <!-- / 文档导航 -->
 
 <!--
   Navigation table with target audience.
@@ -55,7 +55,7 @@ flowchart TB
 | [Doc Map](doc-map.md) | {{ DM_DESCRIPTION }} | {{ DM_AUDIENCE }} |
 | [{{ DOMAIN_1 }}]({{ DOMAIN_1_PATH }}/_index.md) | {{ DOMAIN_1_DESCRIPTION }} | {{ DOMAIN_1_AUDIENCE }} |
 
-## Core Features / 核心功能
+## Core Features <!-- / 核心功能 -->
 
 <!--
   Feature table with links to relevant modules.
@@ -68,7 +68,7 @@ flowchart TB
 | {{ FEATURE_2 }} | {{ FEATURE_2_DESC }} | [{{ MODULE_2 }}]({{ MODULE_2_PATH }}) |
 | {{ FEATURE_3 }} | {{ FEATURE_3_DESC }} | [{{ MODULE_3 }}]({{ MODULE_3_PATH }}) |
 
-## Quick Start / 快速开始
+## Quick Start <!-- / 快速开始 -->
 
 <!--
   Working code example with expected output.
@@ -85,7 +85,7 @@ flowchart TB
 {{ EXPECTED_OUTPUT }}
 ```
 
-## Project Statistics / 项目统计
+## Project Statistics <!-- / 项目统计 -->
 
 | Metric | Value |
 |--------|-------|

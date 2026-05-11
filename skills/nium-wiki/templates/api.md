@@ -12,7 +12,7 @@
 
 # {{ MODULE_NAME }} API Reference
 
-## Module Overview / 模块概述
+## Module Overview <!-- / 模块概述 -->
 
 <!--
   Brief overview with import example.
@@ -25,7 +25,7 @@
 {{ IMPORT_EXAMPLE }}
 ```
 
-## API Overview / API 概览
+## API Overview <!-- / API 概览 -->
 
 <!--
   API overview table.
@@ -37,7 +37,7 @@
 | `{{ API_2 }}` | {{ TYPE_2 }} | {{ API_2_DESC }} |
 | `{{ API_3 }}` | {{ TYPE_3 }} | {{ API_3_DESC }} |
 
-## Type Definitions / 类型定义
+## Type Definitions <!-- / 类型定义 -->
 
 <!--
   Type definitions with property tables.
@@ -55,7 +55,7 @@
 | {{ PROP_1 }} | `{{ PROP_1_TYPE }}` | {{ REQUIRED }} | {{ DEFAULT }} | {{ PROP_1_DESC }} |
 | {{ PROP_2 }} | `{{ PROP_2_TYPE }}` | {{ REQUIRED }} | {{ DEFAULT }} | {{ PROP_2_DESC }} |
 
-## Functions / 函数
+## Functions <!-- / 函数 -->
 
 <!--
   For each function: signature, params, returns, exceptions, 1-3 code examples.
@@ -100,7 +100,7 @@
 **Section sources**
 - [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }})
 
-## Type Relationships / 类型关系图
+## Type Relationships <!-- / 类型关系图 -->
 
 <!--
   OPTIONAL: Include only if the module has multiple types/interfaces with meaningful relationships.
@@ -116,7 +116,7 @@ flowchart LR
     TypeA -.->|implements| TypeI[Interface]
 ```
 
-## Usage Patterns / 使用模式
+## Usage Patterns <!-- / 使用模式 -->
 
 <!--
   Common usage patterns and recipes.
@@ -137,7 +137,7 @@ flowchart LR
   Skip this section for straightforward APIs.
 -->
 
-## Deprecated APIs / 废弃 API
+## Deprecated APIs <!-- / 废弃 API -->
 
 <!--
   OPTIONAL: Include only if the module has deprecated APIs.
@@ -148,7 +148,7 @@ flowchart LR
 |----------------|-------------|------------|----------------|
 | `{{ DEPRECATED_API }}` | `{{ REPLACEMENT_API }}` | `{{ VERSION }}` | {{ MIGRATION_GUIDE }} |
 
-## Related Documents / 相关文档
+## Related Documents <!-- / 相关文档 -->
 
 - [{{ PARENT_MODULE }}]({{ PARENT_MODULE_PATH }}) — Parent module documentation
 

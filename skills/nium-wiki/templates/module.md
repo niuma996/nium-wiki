@@ -12,7 +12,7 @@
 
 # {{ MODULE_NAME }}
 
-## 1. Module Overview / 模块概述
+## 1. Module Overview
 
 <!--
   2-3 paragraphs (NOT sentences)
@@ -30,7 +30,7 @@
 **Section sources**
 - [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }})
 
-## 2. Architecture Position / 架构位置图
+## 2. Architecture Position <!-- / 架构位置图 -->
 
 <!--
   SKIP in incremental mode if the module's position in the architecture has not changed.
@@ -48,7 +48,7 @@ flowchart TB
 **Diagram sources**
 - [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }})
 
-## 3. Feature Table / 功能表
+## 3. Feature Table <!-- / 功能表 -->
 
 <!--
   Feature table with related APIs.
@@ -60,7 +60,7 @@ flowchart TB
 | {{ FEATURE_2 }} | {{ FEATURE_2_DESC }} | `{{ API_2 }}` |
 | {{ FEATURE_3 }} | {{ FEATURE_3_DESC }} | `{{ API_3 }}` |
 
-## 4. File Structure / 文件结构
+## 4. File Structure <!-- / 文件结构 -->
 
 <!--
   File tree with responsibility descriptions.
@@ -74,7 +74,7 @@ flowchart TB
 └── {{ FILE_4 }}        # {{ FILE_4_RESPONSIBILITY }}
 ```
 
-## 5. Core Workflow Diagram / 核心工作流图
+## 5. Core Workflow Diagram <!-- / 核心工作流图 -->
 
 <!--
   SKIP in incremental mode if the workflow has not changed.
@@ -94,7 +94,7 @@ flowchart TD
 **Diagram sources**
 - [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }})
 
-## 6. State Diagram / 状态图
+## 6. State Diagram <!-- / 状态图 -->
 
 <!--
   OPTIONAL: Include only for stateful modules (connection managers, order flows, workflow engines, etc.).
@@ -114,7 +114,7 @@ flowchart TD
   ```
 -->
 
-## 7. API Summary / API 概览
+## 7. API Summary <!-- / API 概览 -->
 
 <!--
   API overview table only. Detailed signatures, parameters, and type definitions
@@ -128,14 +128,14 @@ flowchart TD
 
 > Full API reference: [{{ MODULE_NAME }} API](../api/{{ MODULE_SLUG }}.md)
 
-## 8. Usage Examples / 使用示例
+## 8. Usage Examples <!-- / 使用示例 -->
 
 <!--
   1-3 examples depending on module complexity.
   The first example serves as the Quick Start.
 -->
 
-### Quick Start / 快速开始
+### Quick Start <!-- / 快速开始 -->
 
 <!-- Source: [{{ SOURCE_FILE }}](/{{ SOURCE_PATH }}#L{{ START }}-L{{ END }}) -->
 ```{{ LANGUAGE }}
@@ -149,23 +149,23 @@ flowchart TD
 {{ EXAMPLE_2_CODE }}
 ```
 
-## 9. Best Practices / 最佳实践
+## 9. Best Practices <!-- / 最佳实践 -->
 
 <!--
   Recommended and avoid patterns.
 -->
 
-### Recommended / 推荐
+### Recommended <!-- / 推荐 -->
 
 - {{ RECOMMENDED_1 }}
 - {{ RECOMMENDED_2 }}
 
-### Avoid / 避免
+### Avoid <!-- / 避免 -->
 
 - {{ AVOID_1 }}
 - {{ AVOID_2 }}
 
-## 10. Design Decisions & Trade-offs / 设计决策与权衡
+## 10. Design Decisions & Trade-offs <!-- / 设计决策与权衡 -->
 
 <!--
   OPTIONAL: Include only for core modules with significant design choices.
@@ -176,7 +176,7 @@ flowchart TD
 |----------|------------------------|-----------|
 | {{ DECISION_1 }} | {{ ALTERNATIVES_1 }} | {{ RATIONALE_1 }} |
 
-## 11. Dependencies & Related Docs / 依赖与相关文档
+## 11. Dependencies & Related Docs <!-- / 依赖与相关文档 -->
 
 <!--
   Dependency diagram plus cross-links to related documentation.

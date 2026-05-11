@@ -8,9 +8,9 @@
 
 ---
 
-# Getting Started / 快速开始
+# Getting Started <!-- / 快速开始 -->
 
-## Prerequisites / 前置条件
+## Prerequisites <!-- / 前置条件 -->
 
 <!--
   Prerequisites table. Add rows as needed.
@@ -20,7 +20,7 @@
 |-------------|---------|-------------|
 | {{ PREREQ_1 }} | {{ VERSION_1 }} | {{ PREREQ_1_DESC }} |
 
-## Installation / 安装
+## Installation <!-- / 安装 -->
 
 <!--
   Primary installation method is required.
@@ -42,7 +42,7 @@
   ```
 -->
 
-## Configuration / 配置说明
+## Configuration <!-- / 配置说明 -->
 
 <!--
   Configuration explanation.
@@ -59,7 +59,7 @@
 | {{ OPTION_1 }} | `{{ OPTION_1_TYPE }}` | `{{ DEFAULT_1 }}` | {{ OPTION_1_DESC }} |
 | {{ OPTION_2 }} | `{{ OPTION_2_TYPE }}` | `{{ DEFAULT_2 }}` | {{ OPTION_2_DESC }} |
 
-## First Example (Step by Step) / 第一个示例（分步）
+## First Example (Step by Step) <!-- / 第一个示例（分步） -->
 
 <!--
   At least 2 steps. Add more only if the workflow requires them.
@@ -87,7 +87,7 @@
 {{ EXPECTED_OUTPUT }}
 ```
 
-## Next Steps / 下一步
+## Next Steps <!-- / 下一步 -->
 
 <!--
   Next steps table.
@@ -98,7 +98,7 @@
 | {{ NEXT_1 }} | {{ NEXT_1_DESC }} | [{{ NEXT_1_LINK_TEXT }}]({{ NEXT_1_PATH }}) |
 | {{ NEXT_2 }} | {{ NEXT_2_DESC }} | [{{ NEXT_2_LINK_TEXT }}]({{ NEXT_2_PATH }}) |
 
-## Troubleshooting / 故障排除
+## Troubleshooting <!-- / 故障排除 -->
 
 <!--
   OPTIONAL: Include common problems and solutions.
@@ -110,7 +110,7 @@
 | `{{ ERROR_1 }}` | {{ CAUSE_1 }} | {{ SOLUTION_1 }} |
 | `{{ ERROR_2 }}` | {{ CAUSE_2 }} | {{ SOLUTION_2 }} |
 
-## Related Documents / 相关文档
+## Related Documents <!-- / 相关文档 -->
 
 - [Homepage](index.md)
 - [Architecture](architecture.md)

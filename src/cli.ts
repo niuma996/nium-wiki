@@ -45,7 +45,14 @@ function requireWikiDir(resolvedProjectRoot: string): boolean {
 
 import { initNiumWiki, printInitResult } from './infra/initWiki';
 import { getOsLang, loadI18nConfig, appendLangToConfig } from './utils/i18n';
-import { analyzeProject, printAnalysis } from './core/analyzeProject';
+import {
+  analyzeProject,
+  printAnalysis,
+  discoverModulesFromGraph,
+  mergeDiscoveredModules,
+  DiscoveredModule,
+  ModuleInfo,
+} from './core/analyzeProject';
 import { diffSourceIndex, updateSourceIndex, printSourceDiff } from './core/sourceIndex';
 import { extractDocsFromFile, docsToMarkdown } from './core/extractDocs';
 import {
@@ -58,6 +65,7 @@ import { generateToc, generateSidebar } from './generation/generateToc';
 import { writeSidebarJson, generateSidebarJson, migrateFromSidebarMd } from './generation/generateSidebarJson';
 import { buildDocIndex, enrichWithInference, saveDocIndex } from './core/buildDocIndex';
 import { buildDependencyGraph, saveDependencyGraph, loadDependencyGraph } from './core/buildDeps';
+import { loadCache } from './utils/cache';
 import {
   buildIncrementalPlan,
   printIncrementalPlan,
@@ -74,7 +82,29 @@ import {
   analyzeAllModules,
   formatModuleAnalysis,
   printBatchAnalysis,
+  extractModuleFacts,
+  saveModuleFacts,
+  loadModuleFacts,
+  ModuleFacts,
 } from './commands/analyzeModule';
+/**
+ * Load dep-graph.json, auto-building it if missing.
+ * Avoids "run build-deps first" friction for discover-modules and analyze-batch users.
+ */
+function ensureDependencyGraph(projectRoot: string) {
+  const cached = loadDependencyGraph(projectRoot);
+  if (cached) return cached;
+
+  console.log('ℹ️  dep-graph.json not found, building automatically...');
+  const changes = diffSourceIndex(projectRoot);
+  const liveFiles = [...changes.added, ...changes.modified, ...changes.unchanged];
+  const graph = buildDependencyGraph(projectRoot, liveFiles);
+  saveDependencyGraph(projectRoot, graph);
+  const edgeCount = Object.values(graph.imports).reduce((s, v) => s + v.length, 0);
+  console.log(`✅ Dependency graph built: ${liveFiles.length} files, ${edgeCount} edges\n`);
+  return graph;
+}
+
 const program = new Command();
 
 program
@@ -143,6 +173,8 @@ program
   .option('--json', 'Output structured JSON for machine consumption', false)
   .action((modulePath: string, opts: { batch: boolean; json: boolean }) => {
     const projectRoot = process.cwd();
+    if (!requireWikiDir(projectRoot)) { process.exitCode = 1; return; }
+    ensureDependencyGraph(projectRoot);
 
     if (opts.batch) {
       const result = analyzeAllModules(projectRoot);
@@ -176,6 +208,128 @@ program
       console.log(JSON.stringify(analysis, null, 2));
     } else {
       console.log(formatModuleAnalysis(analysis));
+    }
+  });
+
+// ── discover-modules ─────────────────────────────────────────
+program
+  .command('discover-modules')
+  .description('Discover all modules via import graph + directory scan (replaces analyze for SKILL.md)')
+  .argument('[project-path]', 'Project root directory', process.cwd())
+  .option('--json', 'Output structured JSON', false)
+  .option('--min-files <n>', 'Minimum files per module', '2')
+  .action((projectPath: string, opts: { json: boolean; minFiles: string }) => {
+    const resolved = path.resolve(projectPath);
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
+
+    const minFiles = parseInt(opts.minFiles, 10);
+    if (isNaN(minFiles) || minFiles < 1) {
+      console.error('Error: --min-files must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+    const graph = ensureDependencyGraph(resolved);
+
+    const dirModules = (() => {
+      const cached = loadCache(
+        path.join(resolved, '.nium-wiki'), 'structure.json', null
+      ) as { modules?: ModuleInfo[] } | null;
+      return cached?.modules ?? [];
+    })();
+
+    const graphModules = discoverModulesFromGraph(resolved, graph, minFiles);
+
+    const merged = mergeDiscoveredModules(graphModules, dirModules);
+
+    if (opts.json) {
+      console.log(JSON.stringify(merged, null, 2));
+      return;
+    }
+
+    console.log(`\nDiscovered ${merged.length} modules:\n`);
+    for (const m of merged) {
+      const lang = m.language ? ` [${m.language}]` : '';
+      const src = m.source === 'both' ? '✓graph+dir' : m.source === 'graph' ? '✓graph' : '  dir';
+      console.log(`  ${src}  ${m.path}  (${m.files} files)${lang}`);
+    }
+  });
+
+// ── analyze-batch ─────────────────────────────────────────────
+program
+  .command('analyze-batch')
+  .description('Extract ModuleFacts for all discovered modules and cache to .nium-wiki/cache/facts/')
+  .argument('[project-path]', 'Project root directory', process.cwd())
+  .option('--force', 'Re-extract even if cache is valid', false)
+  .option('--json', 'Output structured JSON summary', false)
+  .option('--min-confidence <n>', 'Override confidence threshold for needsReview (default: 0.3, range: 0–1)', '0.3')
+  .action((projectPath: string, opts: { force: boolean; json: boolean; minConfidence: string }) => {
+    const resolved = path.resolve(projectPath);
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
+
+    const minConfidence = parseFloat(opts.minConfidence);
+    if (isNaN(minConfidence) || minConfidence < 0 || minConfidence > 1) {
+      console.error('Error: --min-confidence must be a number between 0 and 1');
+      process.exitCode = 1;
+      return;
+    }
+
+    const graph = ensureDependencyGraph(resolved);
+
+    const dirModules = (() => {
+      const cached = loadCache(
+        path.join(resolved, '.nium-wiki'), 'structure.json', null
+      ) as { modules?: ModuleInfo[] } | null;
+      return cached?.modules ?? [];
+    })();
+    const graphModules = discoverModulesFromGraph(resolved, graph);
+    const allModules = mergeDiscoveredModules(graphModules, dirModules);
+
+    if (allModules.length === 0) {
+      console.error('No modules found. The project may not contain any supported source files.');
+      process.exitCode = 1;
+      return;
+    }
+
+    const results: ModuleFacts[] = [];
+    const reviewList: string[] = [];
+
+    for (const mod of allModules) {
+      const absPath = path.resolve(resolved, mod.path);
+      if (!fs.existsSync(absPath)) continue;
+
+      if (!opts.force) {
+        const cached = loadModuleFacts(resolved, mod.path);
+        if (cached) {
+          // Apply threshold override to cached facts (in-memory only)
+          if (cached.confidence < minConfidence) cached.needsReview = true;
+          results.push(cached);
+          if (cached.needsReview) reviewList.push(mod.path);
+          continue;
+        }
+      }
+
+      const facts = extractModuleFacts(absPath, resolved);
+      saveModuleFacts(resolved, facts);
+      // Apply threshold override after save so cached file keeps default threshold
+      if (facts.confidence < minConfidence) facts.needsReview = true;
+      results.push(facts);
+      if (facts.needsReview) reviewList.push(mod.path);
+    }
+
+    if (opts.json) {
+      console.log(JSON.stringify({ modules: results, reviewList }, null, 2));
+      return;
+    }
+
+    console.log(`\nanalyzed ${results.length} modules, ${reviewList.length} need review\n`);
+    for (const r of results) {
+      const flag = r.needsReview ? '⚠ ' : '✓ ';
+      console.log(`  ${flag}${r.modulePath}  (${r.exports.length} exports, confidence=${r.confidence.toFixed(2)})`);
+    }
+
+    if (reviewList.length > 0) {
+      console.log(`\n⚠  Modules needing review (low confidence or secret detected):`);
+      for (const p of reviewList) console.log(`   - ${p}`);
     }
   });
 

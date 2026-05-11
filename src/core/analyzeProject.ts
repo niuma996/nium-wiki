@@ -9,6 +9,7 @@ import { languageHandlerManager } from '../language-handlers/index';
 import { getExcludeDirs } from '../utils/config';
 import { walkFiles } from '../utils/fileWalker';
 import { saveCache } from '../utils/cache';
+import { DependencyGraph } from '../core/buildDeps';
 
 export interface ModuleFileInfo {
   /** Relative file path within the module, e.g. "client.ts" */
@@ -36,6 +37,14 @@ export interface ModuleInfo {
   template?: 'module.md' | 'module-simple.md';
   /** 复杂度评分（0-100） */
   complexity?: number;
+}
+
+export interface DiscoveredModule {
+  name: string;
+  path: string;           // relative to project root, e.g. "src/core"
+  files: number;
+  language: string | null;
+  source: 'graph' | 'directory' | 'both';
 }
 
 export interface ProjectStats {
@@ -314,6 +323,77 @@ function discoverModulesUnderSrc(
   } catch { /* ignore */ }
 
   return modules;
+}
+
+/**
+ * Discover modules by grouping files in dep-graph.json by common path prefix.
+ * Returns one entry per unique top-two-segment prefix that contains ≥ minFiles files.
+ */
+export function discoverModulesFromGraph(
+  projectRoot: string,
+  graph: DependencyGraph,
+  minFiles = 2,
+): DiscoveredModule[] {
+  const prefixCounts: Record<string, Set<string>> = {};
+
+  for (const file of Object.keys(graph.imports)) {
+    const parts = file.replace(/\\/g, '/').split('/');
+    // Use up to 2 path segments as the module prefix (e.g. "src/core", "cmd/server")
+    const prefix = parts.length >= 2 ? `${parts[0]}/${parts[1]}` : parts[0];
+    if (!prefixCounts[prefix]) prefixCounts[prefix] = new Set();
+    prefixCounts[prefix].add(file);
+  }
+
+  const modules: DiscoveredModule[] = [];
+  for (const [prefix, files] of Object.entries(prefixCounts)) {
+    if (files.size < minFiles) continue;
+    const name = prefix.split('/').pop() ?? prefix;
+    // Majority-vote language detection across all files in the module
+    const langCounts: Record<string, number> = {};
+    for (const f of files) {
+      const l = languageHandlerManager.detectLanguageFromFile(path.basename(f));
+      if (l) langCounts[l] = (langCounts[l] ?? 0) + 1;
+    }
+    const lang = Object.keys(langCounts).sort((a, b) => langCounts[b] - langCounts[a])[0] ?? null;
+    modules.push({
+      name,
+      path: prefix,
+      files: files.size,
+      language: lang,
+      source: 'graph',
+    });
+  }
+
+  return modules;
+}
+
+/**
+ * Merge graph-based and directory-based discovery results.
+ * Graph results take precedence; directory results fill gaps.
+ * Dedup by path prefix.
+ */
+export function mergeDiscoveredModules(
+  graphModules: DiscoveredModule[],
+  dirModules: ModuleInfo[],
+): DiscoveredModule[] {
+  const byPath = new Map<string, DiscoveredModule>(graphModules.map(m => [m.path, m]));
+
+  for (const m of dirModules) {
+    const existing = byPath.get(m.path);
+    if (existing) {
+      existing.source = 'both';
+    } else {
+      byPath.set(m.path, {
+        name: m.name,
+        path: m.path,
+        files: m.files,
+        language: null, // ModuleInfo carries no language info
+        source: 'directory',
+      });
+    }
+  }
+
+  return [...byPath.values()];
 }
 
 function discoverModules(

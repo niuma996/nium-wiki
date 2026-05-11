@@ -33,7 +33,7 @@ export function loadCache<T>(wikiDir: string, cacheName: string, defaultValue: T
  * @param data Data to serialize / 要序列化的数据
  */
 export function saveCache<T>(wikiDir: string, cacheName: string, data: T): void {
-  const cacheDir = path.join(wikiDir, 'cache');
-  fs.mkdirSync(cacheDir, { recursive: true });
-  fs.writeFileSync(path.join(cacheDir, cacheName), JSON.stringify(data, null, 2), 'utf-8');
+  const filePath = path.join(wikiDir, 'cache', cacheName);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }

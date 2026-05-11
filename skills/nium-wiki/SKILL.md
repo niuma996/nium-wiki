@@ -276,6 +276,36 @@ Every code example must:
 - **Correct (source)**: `[version.ts](/src/utils/version.ts#L1)`
 - **Correct (wiki page)**: `[API reference](../api/version.md)`
 
+### Facts-First Rule
+
+Before writing any API description, function signature, or export list for a module:
+
+1. Read `.nium-wiki/cache/facts/<module-path-with-slashes-replaced-by-double-underscores>.json`
+2. All export names and signatures in the documentation MUST match `exports[]` in the facts file
+3. If a symbol is not in `exports[]`, do not document it as a public API. If `exports[]` contains symbols not yet in the document, add them.
+4. If the facts file does not exist, run `node scripts/index.cjs analyze-batch <project-root>` before proceeding — this writes facts to `.nium-wiki/cache/facts/`. Do NOT generate documentation without facts.
+
+### Multi-Module Generation Mode
+
+When generating documentation for multiple modules at once using `analyze-batch`:
+
+1. Run `node scripts/index.cjs discover-modules <project-root> --json` to get the full module list
+2. Run `node scripts/index.cjs analyze-batch <project-root>` to extract facts for all modules
+3. Output one summary table before starting generation:
+   - Total modules discovered
+   - Modules with `needsReview: true` (list paths and reasons)
+   - Estimated documents to generate
+4. For modules with `needsReview: true`: pause and list them with their reason (`confidence < 0.3` or `secret detected`). Wait for user confirmation before generating those modules. All other modules proceed automatically.
+5. Do NOT output a per-module Exploration Report in batch mode — the summary table replaces it.
+
+### Incremental Facts Rule
+
+On patch operations (updating existing documentation after code changes), run this **before Step 1 of the Surgical Edit sequence**:
+
+1. Re-read the module's `facts.json` even if the document already exists
+2. The facts file is the authoritative source for what the current API looks like
+3. The existing document is a starting point for structure, not a source of truth for API signatures
+
 ---
 
 ## Mode Overrides
@@ -312,6 +342,7 @@ Before invoking any CLI commands, parse the user input to determine the executio
 ## Module-Targeted Generation
 
 > **Applies when**: InputType = `MODULE_TARGETED` (user specifies a specific module).
+> **Otherwise**: For `FULL` mode (no module specified, e.g. "generate wiki" / "rebuild wiki"), skip this entire section and follow [Multi-Module Generation Mode](#multi-module-generation-mode) — the summary table there replaces the per-module Exploration Report.
 
 ### Step 0 — Path Resolution
 
@@ -457,7 +488,9 @@ User Input
 
 ```bash
 node scripts/index.cjs init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de); run from project root
-node scripts/index.cjs analyze [path]             # Analyze project structure
+node scripts/index.cjs build-deps <project-root>              # Build import/require dependency graph
+node scripts/index.cjs discover-modules <project-root>        # Discover all modules in the project
+node scripts/index.cjs analyze-batch <project-root>           # Extract facts for all modules
 node scripts/index.cjs analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
 node scripts/index.cjs incremental [path]         # Run incremental pipeline: diff → deps → doc-index → affected docs; run from project root
 node scripts/index.cjs diff-index [path]          # Detect file changes (--no-update to skip hash write); run from project root
@@ -516,7 +549,13 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 
 ### 4. Project Analysis (Deep)
 
-Run `node scripts/index.cjs analyze .` or analyze manually:
+Run the following commands, or analyze manually:
+
+```bash
+node scripts/index.cjs build-deps <project-root>
+node scripts/index.cjs discover-modules <project-root>
+node scripts/index.cjs analyze-batch <project-root>
+```
 
 1. **Identify tech stack**: Check dependency manifests (e.g. package.json, requirements.txt, go.mod, Cargo.toml, pom.xml, etc.)
 2. **Find entry points**: Locate main source files (e.g. src/index.ts, main.py, main.go, main.rs, src/main/java/App.java, etc.)

@@ -17,8 +17,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { languageHandlerManager } from '../language-handlers/index';
 import { loadDependencyGraph } from '../core/buildDeps';
+import { saveCache, loadCache } from '../utils/cache';
 
 export type ModuleRole = 'core' | 'api' | 'utility' | 'ui' | 'test' | 'config' | 'unknown';
 export type TemplateType = 'module.md' | 'module-simple.md';
@@ -143,6 +145,160 @@ const EXPORT_PATTERNS: Record<string, RegExp[]> = {
     /\binterface\s+(\w+)/gm,
   ],
 };
+
+const SECRET_PATTERNS: RegExp[] = [
+  /(?:api[_-]?key|apikey|secret[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*['"][^'"]{8,}['"]/i,
+  /(?:password|passwd|pwd)\s*[:=]\s*['"][^'"]{4,}['"]/i,
+  /(?:sk-|pk-|ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]{10,}/,
+];
+
+function containsSecret(content: string): boolean {
+  return SECRET_PATTERNS.some(p => p.test(content));
+}
+
+export interface ExportFact {
+  name: string;
+  kind: 'function' | 'class' | 'const' | 'type' | 'interface' | 'module' | null;
+  signature: string;
+  file: string;
+  line: number;
+}
+
+export interface FileSummary {
+  file: string;
+  symbols: string[];
+  lineCount: number;
+}
+
+export interface ModuleFacts {
+  modulePath: string;
+  language: string;
+  exports: ExportFact[];
+  internalDeps: string[];
+  externalDeps: string[];
+  fileSummaries: FileSummary[];
+  confidence: number;
+  needsReview: boolean;
+  extractedAt: string;
+  sourceHashes: Record<string, string>;
+}
+
+function extractFileSummary(filePath: string, projectRoot: string): FileSummary & { hasSecret: boolean; hash: string } {
+  const rel = path.relative(projectRoot, filePath).replace(/\\/g, '/');
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n');
+    const lang = languageHandlerManager.detectLanguageFromFile(path.basename(filePath)) ?? 'javascript';
+    const patterns = EXPORT_PATTERNS[lang] ?? EXPORT_PATTERNS.javascript;
+    const symbols = new Set<string>();
+    for (const p of patterns) {
+      p.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = p.exec(content)) !== null) {
+        const sym = m[1] || m[2] || m[3];
+        if (sym) symbols.add(sym);
+      }
+    }
+    const hash = createHash('sha256').update(content).digest('hex');
+    return {
+      file: rel,
+      symbols: [...symbols],
+      lineCount: lines.length,
+      hasSecret: containsSecret(content),
+      hash,
+    };
+  } catch {
+    return { file: rel, symbols: [], lineCount: 0, hasSecret: false, hash: '' };
+  }
+}
+
+export function extractModuleFacts(modulePath: string, projectRoot: string): ModuleFacts {
+  const relModulePath = path.relative(projectRoot, modulePath).replace(/\\/g, '/');
+  const graph = loadDependencyGraph(projectRoot);
+
+  const sourceFiles: string[] = [];
+  try {
+    const entries = fs.readdirSync(modulePath, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.isFile() && languageHandlerManager.detectLanguageFromFile(e.name)) {
+        sourceFiles.push(path.join(modulePath, e.name));
+      }
+    }
+  } catch { /* ignore */ }
+
+  const fileSummaries: FileSummary[] = [];
+  const sourceHashes: Record<string, string> = {};
+  let hasSecret = false;
+  let detectedLang = 'unknown';
+
+  for (const fp of sourceFiles) {
+    const summary = extractFileSummary(fp, projectRoot);
+    fileSummaries.push({ file: summary.file, symbols: summary.symbols, lineCount: summary.lineCount });
+    sourceHashes[summary.file] = summary.hash;
+    if (summary.hasSecret) hasSecret = true;
+    if (detectedLang === 'unknown') {
+      detectedLang = languageHandlerManager.detectLanguageFromFile(path.basename(fp)) ?? 'unknown';
+    }
+  }
+
+  const exports: ExportFact[] = [];
+  for (const summary of fileSummaries) {
+    for (const sym of summary.symbols) {
+      exports.push({
+        name: sym,
+        kind: null,
+        signature: sym,
+        file: summary.file,
+        line: 0,
+      });
+    }
+  }
+
+  const internalDepsSet = new Set<string>();
+  const externalDepsSet = new Set<string>();
+  if (graph) {
+    for (const fp of sourceFiles) {
+      const rel = path.relative(projectRoot, fp).replace(/\\/g, '/');
+      for (const dep of graph.imports[rel] ?? []) {
+        if (dep.startsWith(relModulePath + '/') || dep === relModulePath) {
+          internalDepsSet.add(dep);
+        } else {
+          externalDepsSet.add(dep);
+        }
+      }
+    }
+  }
+  const internalDeps = [...internalDepsSet];
+  const externalDeps = [...externalDepsSet];
+
+  const filesWithSymbols = fileSummaries.filter(s => s.symbols.length > 0).length;
+  const confidence = sourceFiles.length === 0 ? 0 : filesWithSymbols / sourceFiles.length;
+
+  return {
+    modulePath: relModulePath,
+    language: detectedLang,
+    exports,
+    internalDeps,
+    externalDeps,
+    fileSummaries,
+    confidence,
+    needsReview: confidence < 0.3 || hasSecret,
+    extractedAt: new Date().toISOString(),
+    sourceHashes,
+  };
+}
+
+export function saveModuleFacts(projectRoot: string, facts: ModuleFacts): void {
+  const wikiDir = path.join(projectRoot, '.nium-wiki');
+  const cacheKey = `facts/${facts.modulePath.replace(/\//g, '__')}.json`;
+  saveCache(wikiDir, cacheKey, facts);
+}
+
+export function loadModuleFacts(projectRoot: string, modulePath: string): ModuleFacts | null {
+  const wikiDir = path.join(projectRoot, '.nium-wiki');
+  const cacheKey = `facts/${modulePath.replace(/\//g, '__')}.json`;
+  return loadCache<ModuleFacts | null>(wikiDir, cacheKey, null);
+}
 
 /**
  * 提取模块中所有公开导出（按语言检测文件）

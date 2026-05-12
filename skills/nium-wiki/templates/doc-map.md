@@ -14,36 +14,32 @@
 
 <!--
   MANDATORY: Mermaid flowchart showing document relationships.
+
+  Rules:
+  - Always include: index, arch, gs, docmap as root nodes
+  - Add one subgraph per business domain discovered in the project
+  - Add an "api" subgraph only if the project has API reference docs
+  - Connect nodes to show reading/dependency relationships, not file hierarchy
+  - Use English IDs for subgraph/node identifiers (avoid CJK in IDs)
+  - Adjust the number of subgraphs and nodes to match the actual project
 -->
 
 ```mermaid
 flowchart TB
-    index["{{ HOME_LABEL }}"]
-    arch["{{ ARCH_LABEL }}"]
-    gs["{{ GS_LABEL }}"]
-    docmap["{{ DOCMAP_LABEL }}"]
+    index["Homepage"]
+    arch["Architecture"]
+    gs["Getting Started"]
+    docmap["Doc Map"]
 
-    subgraph {{ DOMAIN_1 }}["{{ DOMAIN_1_LABEL }}"]
+    subgraph {{ DOMAIN_1_ID }}["{{ DOMAIN_1_LABEL }}"]
         {{ DOMAIN_1_MOD_1 }}["{{ DOMAIN_1_MOD_1_LABEL }}"]
         {{ DOMAIN_1_MOD_2 }}["{{ DOMAIN_1_MOD_2_LABEL }}"]
-    end
-
-    subgraph {{ DOMAIN_2 }}["{{ DOMAIN_2_LABEL }}"]
-        {{ DOMAIN_2_MOD_1 }}["{{ DOMAIN_2_MOD_1_LABEL }}"]
-    end
-
-    subgraph api["API Reference"]
-        {{ API_1 }}["{{ API_1_LABEL }}"]
-        {{ API_2 }}["{{ API_2_LABEL }}"]
     end
 
     index --> arch
     index --> gs
     index --> docmap
-    arch --> {{ DOMAIN_1 }}
-    arch --> {{ DOMAIN_2 }}
-    {{ DOMAIN_1_MOD_1 }} --> {{ API_1 }}
-    {{ DOMAIN_2_MOD_1 }} --> {{ API_2 }}
+    arch --> {{ DOMAIN_1_ID }}
 ```
 
 ## Recommended Reading Path <!-- / 推荐阅读路径 -->

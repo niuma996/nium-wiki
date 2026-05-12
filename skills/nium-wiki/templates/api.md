@@ -130,11 +130,16 @@ flowchart LR
 {{ PATTERN_1_CODE }}
 ```
 
-## FAQ
-
 <!--
-  OPTIONAL: Include for complex APIs with common pitfalls.
-  Skip this section for straightforward APIs.
+  OPTIONAL: FAQ section — include only for complex APIs with common pitfalls.
+
+  ## FAQ
+
+  **Q: {{ QUESTION_1 }}**
+  {{ ANSWER_1 }}
+
+  **Q: {{ QUESTION_2 }}**
+  {{ ANSWER_2 }}
 -->
 
 ## Deprecated APIs <!-- / 废弃 API -->

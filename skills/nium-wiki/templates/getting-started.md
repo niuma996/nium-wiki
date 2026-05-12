@@ -98,17 +98,16 @@
 | {{ NEXT_1 }} | {{ NEXT_1_DESC }} | [{{ NEXT_1_LINK_TEXT }}]({{ NEXT_1_PATH }}) |
 | {{ NEXT_2 }} | {{ NEXT_2_DESC }} | [{{ NEXT_2_LINK_TEXT }}]({{ NEXT_2_PATH }}) |
 
-## Troubleshooting <!-- / 故障排除 -->
-
 <!--
-  OPTIONAL: Include common problems and solutions.
-  Skip if no known issues exist for this project.
--->
+  OPTIONAL: Troubleshooting section.
+  Include only if there are known common problems. Skip entirely if none exist.
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| `{{ ERROR_1 }}` | {{ CAUSE_1 }} | {{ SOLUTION_1 }} |
-| `{{ ERROR_2 }}` | {{ CAUSE_2 }} | {{ SOLUTION_2 }} |
+  ## Troubleshooting
+
+  | Problem | Possible Cause | Solution |
+  |---------|---------------|----------|
+  | `{{ ERROR_1 }}` | {{ CAUSE_1 }} | {{ SOLUTION_1 }} |
+-->
 
 ## Related Documents <!-- / 相关文档 -->
 

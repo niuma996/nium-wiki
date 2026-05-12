@@ -240,7 +240,7 @@ Use `module.md` (11 sections) for core modules, `module-simple.md` (6 sections) 
 | 5 | **Best Practices** | ⚡ OPTIONAL |
 | 6 | **Related Docs** | Cross-links |
 
-**Template selection**: Before generating each module's documentation, run `node scripts/index.cjs analyze-module <module-path>` (or `--batch` for all modules) to get structured signals. Use `docScope` as the primary signal — it appears at the top of the output as `**docScope**: \`core\`` (text format) or as `"docScope": "core"` (JSON format with `--json`):
+**Template selection**: Before generating each module's documentation, run `cd <skill-root> && node scripts/index.cjs analyze-module <module-path> --json` to get structured signals. Use `docScope` as the primary signal — it appears as `"docScope": "core"` in the JSON output:
 
 | `docScope` | Use this template | Lines target | Diagrams |
 |---|---|---|---|
@@ -283,24 +283,24 @@ Before writing any API description, function signature, or export list for a mod
 1. Read `.nium-wiki/cache/facts/<module-path-with-slashes-replaced-by-double-underscores>.json`
 2. All export names and signatures in the documentation MUST match `exports[]` in the facts file
 3. If a symbol is not in `exports[]`, do not document it as a public API. If `exports[]` contains symbols not yet in the document, add them.
-4. If the facts file does not exist, run `node scripts/index.cjs analyze-batch <project-root>` before proceeding — this writes facts to `.nium-wiki/cache/facts/`. Do NOT generate documentation without facts.
+4. If the facts file does not exist, run `cd <skill-root> && node scripts/index.cjs analyze-batch <project-root>` before proceeding — this writes facts to `.nium-wiki/cache/facts/`. Do NOT generate documentation without facts.
 
 ### Multi-Module Generation Mode
 
 When generating documentation for multiple modules at once using `analyze-batch`:
 
-1. Run `node scripts/index.cjs discover-modules <project-root> --json` to get the full module list
-2. Run `node scripts/index.cjs analyze-batch <project-root>` to extract facts for all modules
+1. Run `cd <skill-root> && node scripts/index.cjs discover-modules <project-root> --json` to get the full module list
+2. Run `cd <skill-root> && node scripts/index.cjs analyze-batch <project-root>` to extract facts for all modules
 3. Output one summary table before starting generation:
    - Total modules discovered
    - Modules with `needsReview: true` (list paths and reasons)
    - Estimated documents to generate
 4. For modules with `needsReview: true`: pause and list them with their reason (`confidence < 0.3` or `secret detected`). Wait for user confirmation before generating those modules. All other modules proceed automatically.
-5. Do NOT output a per-module Exploration Report in batch mode — the summary table replaces it.
+5. Do NOT output a per-module Exploration Report in Multi-Module Generation Mode — the summary table replaces it.
 
 ### Incremental Facts Rule
 
-On patch operations (updating existing documentation after code changes), run this **before Step 1 of the Surgical Edit sequence**:
+On patch operations (updating existing documentation after code changes), run this **before Step 1 (Read the baseline) of the Surgical Edit sequence**:
 
 1. Re-read the module's `facts.json` even if the document already exists
 2. The facts file is the authoritative source for what the current API looks like
@@ -358,7 +358,7 @@ Normalize all paths relative to the project root.
 ### Step 1 — Pre-flight Check
 
 ```bash
-node scripts/index.cjs analyze-module <path> [--json]
+cd <skill-root> && node scripts/index.cjs analyze-module <module-path> --json
 ```
 
 Read the returned `docScope` and `roleRecommendation`:
@@ -367,6 +367,12 @@ docScope: core      →  module.md (11-section, 400+ lines, 2+ diagrams)
 docScope: overview   →  overview.md (5-section, 80-150 lines)
 docScope: _index     →  _index.md only
 ```
+
+Also read the module's facts file (Facts-First Rule):
+```
+<project-root>/.nium-wiki/cache/facts/<module-path-with-slashes-as-double-underscores>.json
+```
+If missing, run `cd <skill-root> && node scripts/index.cjs analyze-batch <project-root>` first.
 
 Determine document state:
 ```
@@ -380,9 +386,9 @@ else:
 
 Read the actual source code — do not rely on file names or structure alone:
 ```
-read_file: all *.ts/*.js source files in the module directory
-read_file: index.ts / index.js (main exports)
-read_file: types.ts / types.d.ts (type definitions, if present)
+read_file: all source files in the module directory (*.ts/*.js, *.py, *.go, *.rs, *.java, *.cs, *.rb, *.php, etc.)
+read_file: entry/index file (index.ts, __init__.py, mod.rs, package-info.java, etc.)
+read_file: type/interface definitions if present (types.ts, types.d.ts, interfaces/, etc.)
 ```
 
 Analyze:
@@ -449,9 +455,12 @@ User Input
   │    ├─ .nium-wiki does not exist → init → FULL pipeline (Sections 1–9, + Section 10 if multi-language)
   │    └─ .nium-wiki exists → FULL pipeline (Sections 1–9, + Section 10 if multi-language)
   │         │
-  │         └─ After Section 4 (Project Analysis): check project size
+  │         ├─ Section 4 runs: build-deps → discover-modules → analyze-batch
+  │         │    └─ Follow Multi-Module Generation Mode rules during Section 8 (Content Generation)
+  │         │
+  │         └─ After Section 4: check project size
   │              ├─ module count > 10 OR source files > 50 OR LOC > 10,000
-  │              │    └─ Switch to BATCH MODE (see "Progressive Scanning for Large Projects")
+  │              │    └─ Switch to Progressive Scanning (see "Progressive Scanning for Large Projects")
   │              └─ otherwise → continue full pipeline normally
   │
   ├─ "generate wiki for <module>"
@@ -465,7 +474,7 @@ User Input
   │    └─ MODULE_TARGETED + force full regeneration
   │
   ├─ "analyze module X"
-  │    └─ Run `node scripts/index.cjs analyze-module <path> --json` — JSON signals only, no wiki files written
+  │    └─ Run `cd <skill-root> && node scripts/index.cjs analyze-module <module-path> --json` — JSON signals only, no wiki files written
   │
   └─ "refresh / upgrade wiki" (no module)
        └─ MAINTENANCE → audit → regenerate failing docs
@@ -477,35 +486,47 @@ User Input
 
 ### 1. CLI Commands Quick Reference
 
-> **Execution context**: All `node scripts/index.cjs` commands below are run from the **skill root directory**
-> (the directory containing `SKILL.md`), NOT the user's project root. The working directory when
-> executing a skill is always the skill root — this is the industry-standard convention across all
-> Coding Agents (Claude Code, Trae, Cursor, CodeGPT, 通义灵码, etc.).
+> **🔴 Execution context (read first)**: The working directory when a skill runs is **not guaranteed**
+> to be the skill root — it depends on how the host Coding Agent launches tools. The relative path
+> `scripts/index.cjs` therefore cannot be trusted to resolve.
 >
-> Scripts inside `skills/` are portable: the same skill can be installed globally
-> (`<AGENT_HOME>/skills/nium-wiki/`) or project-locally (`./skills/nium-wiki/`) — the relative path
-> `scripts/index.cjs` always resolves correctly.
+> **Rule**: Every runnable example in this document is written as `cd <skill-root> && node scripts/index.cjs ...`.
+> The Coding Agent MUST `cd` into the skill root before each invocation, then pass `<project-root>`
+> as an argument to the command.
+>
+> `<skill-root>` is the directory containing this `SKILL.md` file. The Agent is expected to resolve it
+> from the absolute path of this file (e.g. from `/some/where/nium-wiki/SKILL.md` → `<skill-root>` is
+> `/some/where/nium-wiki`), not guess it from any agent-specific convention.
 
 ```bash
-node scripts/index.cjs init [path] --lang <code>  # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de); run from project root
-node scripts/index.cjs build-deps <project-root>              # Build import/require dependency graph
-node scripts/index.cjs discover-modules <project-root>        # Discover all modules in the project
-node scripts/index.cjs analyze-batch <project-root>           # Extract facts for all modules
-node scripts/index.cjs analyze-module <path> [--batch|--json]  # Analyze module: classify role, recommend template
-node scripts/index.cjs incremental [path]         # Run incremental pipeline: diff → deps → doc-index → affected docs; run from project root
-node scripts/index.cjs diff-index [path]          # Detect file changes (--no-update to skip hash write); run from project root
-node scripts/index.cjs build-index [path]          # Build source ↔ doc mapping index; run from project root
-node scripts/index.cjs build-deps [path]           # Build import/require dependency graph; run from project root
-node scripts/index.cjs generate-sidebar [.nium-wiki] [--all]  # Generate sidebar.json for all language directories
-node scripts/index.cjs audit-docs [.nium-wiki] [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
-node scripts/index.cjs serve [wiki-path]          # Start docsify server
+# Signatures (paths shown without the `cd <skill-root> &&` prefix for readability)
+node scripts/index.cjs init <project-root> --lang <code>              # Initialize .nium-wiki directory (lang: zh/en/ja/ko/fr/de)
+node scripts/index.cjs build-deps <project-root>                      # Build import/require dependency graph
+node scripts/index.cjs discover-modules <project-root>                # Discover all modules via import graph + directory scan
+node scripts/index.cjs analyze-batch <project-root> [--force] [--min-confidence <n>]  # Extract facts for all modules
+node scripts/index.cjs analyze-module <module-path> [--json]          # Analyze one module: classify role, recommend template
+node scripts/index.cjs incremental <project-root> [--no-commit] [-v]  # Full pipeline: diff → deps → doc-index → affected docs
+node scripts/index.cjs diff-index <project-root>                      # Detect file changes (--no-update to skip hash write)
+node scripts/index.cjs build-index <project-root>                     # Build source ↔ doc mapping index
+node scripts/index.cjs generate-sidebar <wiki-path> [--all]           # Generate sidebar.json for all language directories
+node scripts/index.cjs audit-docs <wiki-path> [--verbose|--json|--mermaid-strict|--role <role>]  # Check doc quality
+node scripts/index.cjs serve <wiki-path>                              # Start docsify server
 ```
 
-For detailed usage, see `node scripts/index.cjs --help`
+For detailed usage, see `cd <skill-root> && node scripts/index.cjs --help`
 
-> **⚠️ IMPORTANT**: All commands that take `[path]` (incremental, diff-index, build-index, build-deps, etc.)
-> **must be run from the project root directory**, or pass the absolute/relative path to the project root.
-> The `audit-docs` and `serve` commands take the `.nium-wiki` directory path (default: `.nium-wiki`).
+> **⚠️ Path argument convention**: This document uses four distinct path notations — do not confuse them:
+>
+> | Notation | Meaning |
+> |---|---|
+> | `<skill-root>` | **The directory containing this `SKILL.md` file.** Always `cd` here before invoking `node scripts/index.cjs ...` so the relative path `scripts/index.cjs` resolves regardless of the Agent's default CWD |
+> | `<project-root>` | **Absolute path of the user's current workspace root** — the directory the user is working in (e.g. `/Users/alice/repos/my-app`). Passed as a command argument, NOT as CWD |
+> | `<module-path>` | Project-root-relative path to a single module (e.g. `src/core/analyzeProject`). Used only with `analyze-module` |
+> | `<wiki-path>` | Path to the `.nium-wiki` directory, usually `<project-root>/.nium-wiki`. Used with `generate-sidebar`, `audit-docs`, `serve`, `i18n` |
+>
+> The Agent is responsible for substituting every placeholder with a real value before executing. Do NOT
+> pass the placeholder string literally, and do NOT pass `.` — `.` would resolve against an unpredictable
+> CWD depending on the host Agent.
 
 ### 2. Language Detection (MANDATORY)
 
@@ -527,9 +548,9 @@ Before running any CLI commands or generating any documentation:
 
 | Scenario | Action |
 |----------|--------|
-| Config exists, user wants to add a secondary language (e.g. config=`en`, user wants to also generate `zh`) | Run `node scripts/index.cjs init [path] --lang zh` — appends `zh` as a secondary language to config |
-| User wants to change the primary language (e.g. config=`en`, user wants `zh` as primary) | Run `node scripts/index.cjs init [path] --lang zh --force` — overwrites primary language to `zh` |
-| User wants to generate docs in a language already in config | No config change needed — run `node scripts/index.cjs incremental [path]` directly |
+| Config exists, user wants to add a secondary language (e.g. config=`en`, user wants to also generate `zh`) | Run `cd <skill-root> && node scripts/index.cjs init <project-root> --lang zh` — appends `zh` as a secondary language to config |
+| User wants to change the primary language (e.g. config=`en`, user wants `zh` as primary) | Run `cd <skill-root> && node scripts/index.cjs init <project-root> --lang zh --force` — overwrites primary language to `zh` |
+| User wants to generate docs in a language already in config | No config change needed — run `cd <skill-root> && node scripts/index.cjs incremental <project-root>` directly |
 
 **Why**: Direct file edits to `config.json` bypass the CLI's validation and can corrupt the JSON structure. Always go through the CLI.
 
@@ -549,20 +570,20 @@ Format is slash-separated: the first language is the **primary language** (e.g. 
 
 ### 4. Project Analysis (Deep)
 
-Run the following commands, or analyze manually:
+Run the following commands to build the dependency graph, discover modules, and extract facts:
 
 ```bash
-node scripts/index.cjs build-deps <project-root>
-node scripts/index.cjs discover-modules <project-root>
-node scripts/index.cjs analyze-batch <project-root>
+cd <skill-root> && node scripts/index.cjs build-deps <project-root>
+cd <skill-root> && node scripts/index.cjs discover-modules <project-root>
+cd <skill-root> && node scripts/index.cjs analyze-batch <project-root>
 ```
+
+> `build-deps` is auto-triggered by `discover-modules` and `analyze-batch` if `dep-graph.json` is missing — you can skip it if the graph is already up to date.
 
 1. **Identify tech stack**: Check dependency manifests (e.g. package.json, requirements.txt, go.mod, Cargo.toml, pom.xml, etc.)
 2. **Find entry points**: Locate main source files (e.g. src/index.ts, main.py, main.go, main.rs, src/main/java/App.java, etc.)
-3. **Identify modules**: Scan src/ directory structure
+3. **Identify modules**: Use `discover-modules` output — it merges import-graph discovery with directory scan for full coverage
 4. **Find existing docs**: README.md, CHANGELOG.md, etc.
-
-Save structure to `cache/structure.json`.
 
 ### 5. Deep Code Analysis (CRITICAL)
 
@@ -585,7 +606,7 @@ Save structure to `cache/structure.json`.
 Use the **automated incremental pipeline** to detect changes and compute the precise list of affected docs in one step:
 
 ```bash
-node scripts/index.cjs incremental . [--no-commit] [-v]  # run from project root
+cd <skill-root> && node scripts/index.cjs incremental <project-root> [--no-commit] [-v]
 ```
 
 This runs the full pipeline: `diff-index` → `build-deps` → `build-index` → transitive-impact → doc-dep analysis. It outputs:
@@ -623,7 +644,8 @@ Not all templates are needed for every project. Apply these rules:
 |----------|-----------------|
 | `index.md` | always |
 | `architecture.md` | always |
-| `module.md` / `module-simple.md` | always (choose by module role) |
+| `module.md` / `module-simple.md` / `overview.md` | always (choose by docScope) |
+| `_index.md` | one per domain directory under `wiki/` |
 | `getting-started.md` | project has install steps OR is a library/framework |
 | `api.md` | project exports programmatic APIs (functions/classes/types) |
 | `doc-map.md` | module count >= 5 |
@@ -650,7 +672,11 @@ Not all templates are needed for every project. Apply these rules:
 #### 8.7 Doc Map (`doc-map.md`)
 **Template**: Read `templates/doc-map.md` for full structure.
 
-#### 8.8 Source Links
+#### 8.8 Domain Index (`<domain>/_index.md`)
+**Template**: Read `templates/_index.md` for full structure.
+- One per domain directory. Short overview, architecture diagram, sub-module table — no detailed API docs.
+
+#### 8.9 Source Links
 
 Attach navigable source links next to documented symbols:
 
@@ -664,22 +690,20 @@ Attach navigable source links next to documented symbols:
 - Sanitize link paths and build indexes **after** wiki files are written:
 
 ```bash
-node scripts/index.cjs sanitize-links .  # run from project root
-node scripts/index.cjs build-index .       # run from project root
-node scripts/index.cjs build-deps .       # run from project root
-node scripts/index.cjs diff-index .      # run from project root (--no-update to skip hash write)
+cd <skill-root> && node scripts/index.cjs sanitize-links <project-root>
+cd <skill-root> && node scripts/index.cjs build-index <project-root>
+cd <skill-root> && node scripts/index.cjs diff-index <project-root>  # --no-update to skip hash write
 ```
 
 > `sanitize-links` scans all wiki `.md` files and converts any `file://` absolute paths to project-root-relative paths. **MUST** run before `build-index`.
 > `build-index` scans source path links in wiki files to build `cache/doc-index.json` (source ↔ doc mapping for incremental updates).
-> `build-deps` parses import/require statements to build `cache/dep-graph.json` (dependency graph for impact analysis).
 > `diff-index` (without `--no-update`) is called last so the hash snapshot reflects the final state.
 
 - Refresh `meta.json` timestamp
 - 🔴 **MANDATORY** — Generate sidebar:
 
 ```bash
-node scripts/index.cjs generate-sidebar .nium-wiki --all
+cd <skill-root> && node scripts/index.cjs generate-sidebar <wiki-path> --all
 ```
 
 > This generates `sidebar.json` for all language directories. It is **idempotent** — if `sidebar.json` already exists it will be skipped. If a legacy `_sidebar.md` exists it will be migrated automatically. **This step is mandatory after every wiki generation** — the preview server and all modern tooling depend on `sidebar.json`. Do NOT skip it.
@@ -692,7 +716,7 @@ node scripts/index.cjs generate-sidebar .nium-wiki --all
 
 #### 10.1 Build Translation Task List
 
-Run `node scripts/index.cjs i18n status .nium-wiki` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
+Run `cd <skill-root> && node scripts/index.cjs i18n status <wiki-path>` to get the sync report. Extract every file marked `Missing` or `Outdated` into an explicit checklist (e.g. `❌ [Missing] index.md`, `⚠️ [Outdated] architecture.md`).
 
 **You MUST translate every file in this list — no exceptions, no skipping.**
 
@@ -718,10 +742,10 @@ After each file, report progress: `✅ [3/17] wiki_en/core/_index.md`
 
 After ALL files are translated:
 ```bash
-node scripts/index.cjs i18n sync-memory .nium-wiki
+cd <skill-root> && node scripts/index.cjs i18n sync-memory <wiki-path>
 ```
 
-Run `node scripts/index.cjs i18n status .nium-wiki` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
+Run `cd <skill-root> && node scripts/index.cjs i18n status <wiki-path>` again to verify all files show as `Synced`. If any files are still `Missing` or `Outdated`, go back and translate them.
 
 **Delete rule**: When deleting any file from `wiki/` (e.g. because the source file was deleted), you **MUST** also delete the corresponding file from ALL `wiki_{lang}/` directories.
 
@@ -912,12 +936,12 @@ Infer business domains from the project's directory structure, package boundarie
 
 ## Progressive Scanning for Large Projects
 
-When module count > 10, source files > 50, or LOC > 10,000, switch to batch mode:
+When module count > 10, source files > 50, or LOC > 10,000, switch to Progressive Scanning:
 
 1. **Prioritize modules** — entry points (weight 5) > dependents (4) > has docs (3) > code size (2) > recently modified (1)
 2. **Generate 1-2 modules per batch** — depth scales with complexity
 3. **Track progress** in `cache/progress.json` — record completed/pending modules and current batch number
-4. **After each batch** — run `node scripts/index.cjs audit-docs .nium-wiki --verbose --mermaid-strict`, report results to user, then prompt:
+4. **After each batch** — run `cd <skill-root> && node scripts/index.cjs audit-docs <wiki-path> --verbose --mermaid-strict`, report results to user, then prompt:
    - `"continue"` — next batch
    - `"audit docs"` — re-run validation
    - `"regenerate <module>"` — redo a specific module
@@ -936,7 +960,7 @@ When existing wiki docs are outdated or below quality gate, use one of these str
 | `incremental_upgrade` | Many modules, want to keep existing content | "upgrade wiki" |
 | `targeted_upgrade` | Only specific modules need attention | "upgrade \<module\> docs" |
 
-Execution: scan existing docs with `node scripts/index.cjs audit-docs .nium-wiki --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
+Execution: scan existing docs with `cd <skill-root> && node scripts/index.cjs audit-docs <wiki-path> --mermaid-strict`, generate an upgrade report, then re-generate failing docs batch by batch. **Always include `--mermaid-strict`** so that Mermaid syntax errors block the upgrade and prevent bad diagrams from entering the wiki.
 
 **Version footer** — append to every generated document:
 `*Generated by [Nium-Wiki v{{ NIUM_WIKI_VERSION }}](https://github.com/niuma996/nium-wiki) | {{ GENERATED_AT }}*`
@@ -948,15 +972,15 @@ Execution: scan existing docs with `node scripts/index.cjs audit-docs .nium-wiki
 > **Applies after every wiki generation**: full pipeline, module-targeted, incremental, or surgical patch.
 > This checklist is the **last step of every execution path**. Do not skip any item.
 
-- [ ] `node scripts/index.cjs generate-sidebar .nium-wiki --all`
+- [ ] `cd <skill-root> && node scripts/index.cjs generate-sidebar <wiki-path> --all`
   → Generates `sidebar.json` for all language directories. Idempotent — safe to run multiple times.
   → Migrates legacy `_sidebar.md` to `sidebar.json` automatically if encountered.
   → **⚠️ Do NOT skip**: the preview server and modern tooling depend on `sidebar.json`.
 
-- [ ] `node scripts/index.cjs i18n sync-memory .nium-wiki` (if multi-language)
+- [ ] `cd <skill-root> && node scripts/index.cjs i18n sync-memory <wiki-path>` (if multi-language)
   → Updates translation memory so subsequent runs show accurate sync status.
 
-- [ ] `node scripts/index.cjs audit-docs .nium-wiki --mermaid-strict` (full generation only)
+- [ ] `cd <skill-root> && node scripts/index.cjs audit-docs <wiki-path> --mermaid-strict` (full generation only)
   → Validates all Mermaid diagrams. Mermaid errors block the run — fix them before declaring done.
 
 > **Rule**: These finalization steps must run **after** all wiki content is written and **after** all translation files are updated. They are not optional cleanup — they are part of the generation contract.

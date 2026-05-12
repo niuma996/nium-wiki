@@ -79,16 +79,19 @@ flowchart TB
 <!--
   SKIP in incremental mode if the workflow has not changed.
   MANDATORY for new generation.
+  Use sequenceDiagram to show request/data flow between components.
+  Fall back to flowchart TD only for single-component internal logic with no actors.
 -->
 
 ```mermaid
-flowchart TD
-    A["{{ STEP_1 }}"] --> B["{{ STEP_2 }}"]
-    B --> C{"{{ DECISION }}"}
-    C -->|{{ YES }}| D["{{ STEP_3 }}"]
-    C -->|{{ NO }}| E["{{ STEP_4 }}"]
-    D --> F["{{ STEP_5 }}"]
-    E --> F
+sequenceDiagram
+    participant {{ ACTOR_1 }}
+    participant {{ ACTOR_2 }}
+    participant {{ ACTOR_3 }}
+    {{ ACTOR_1 }}->>{{ ACTOR_2 }}: {{ MESSAGE_1 }}
+    {{ ACTOR_2 }}->>{{ ACTOR_3 }}: {{ MESSAGE_2 }}
+    {{ ACTOR_3 }}-->>{{ ACTOR_2 }}: {{ RESPONSE_1 }}
+    {{ ACTOR_2 }}-->>{{ ACTOR_1 }}: {{ RESPONSE_2 }}
 ```
 
 **Diagram sources**

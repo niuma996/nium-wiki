@@ -486,17 +486,9 @@ User Input
 
 ### 1. CLI Commands Quick Reference
 
-> **🔴 Execution context (read first)**: The working directory when a skill runs is **not guaranteed**
-> to be the skill root — it depends on how the host Coding Agent launches tools. The relative path
-> `scripts/index.cjs` therefore cannot be trusted to resolve.
+> **🔴 Execution context**: Skill CWD is not guaranteed to be the skill root across Coding Agents, so `scripts/index.cjs` cannot be resolved from the default CWD. Every runnable example is written as `cd <skill-root> && node scripts/index.cjs ...` — the Agent MUST `cd` in first, then pass `<project-root>` as an argument.
 >
-> **Rule**: Every runnable example in this document is written as `cd <skill-root> && node scripts/index.cjs ...`.
-> The Coding Agent MUST `cd` into the skill root before each invocation, then pass `<project-root>`
-> as an argument to the command.
->
-> `<skill-root>` is the directory containing this `SKILL.md` file. The Agent is expected to resolve it
-> from the absolute path of this file (e.g. from `/some/where/nium-wiki/SKILL.md` → `<skill-root>` is
-> `/some/where/nium-wiki`), not guess it from any agent-specific convention.
+> `<skill-root>` is the directory containing this `SKILL.md` file. Resolve it from this file's absolute path, do not guess from agent-specific conventions.
 
 ```bash
 # Signatures (paths shown without the `cd <skill-root> &&` prefix for readability)
@@ -638,45 +630,19 @@ Generate content adhering to the **quality gate** defined above:
 
 #### 8.1 Template Selection Rules
 
-Not all templates are needed for every project. Apply these rules:
+Read the named template file from `templates/` before writing each doc. Not all templates are needed for every project — apply these rules:
 
-| Template | When to Generate |
-|----------|-----------------|
-| `index.md` | always |
-| `architecture.md` | always |
-| `module.md` / `module-simple.md` / `overview.md` | always (choose by docScope) |
-| `_index.md` | one per domain directory under `wiki/` |
-| `getting-started.md` | project has install steps OR is a library/framework |
-| `api.md` | project exports programmatic APIs (functions/classes/types) |
-| `doc-map.md` | module count >= 5 |
+| Doc | Template file | When to generate | Notes |
+|---|---|---|---|
+| `index.md` | `templates/index.md` | always | — |
+| `architecture.md` | `templates/architecture.md` | always | — |
+| `modules/<name>.md` | `templates/module.md` (core) or `templates/module-simple.md` (util/config/helper/test) | always (choose by `docScope`) | Module docs only contain an API overview table + link. Detailed signatures and type definitions belong exclusively in `api.md`. |
+| `<domain>/_index.md` | `templates/_index.md` | one per domain directory under `wiki/` | Short overview + architecture diagram + sub-module table. No detailed API docs. |
+| `getting-started.md` | `templates/getting-started.md` | project has install steps OR is a library/framework | — |
+| `api/<name>.md` | `templates/api.md` | project exports programmatic APIs (functions/classes/types) | Single source of truth for all API signatures/types. Mark `@deprecated` with migration guidance. Include parameter constraints where applicable (e.g. "must not be empty", "range 0-100"). |
+| `doc-map.md` | `templates/doc-map.md` | module count >= 5 | — |
 
-#### 8.2 Homepage (`index.md`)
-**Template**: Read `templates/index.md` for full structure.
-
-#### 8.3 Architecture Doc (`architecture.md`)
-**Template**: Read `templates/architecture.md` for full structure.
-
-#### 8.4 Module Docs (`modules/<name>.md`)
-**Templates**: Read `templates/module.md` (core) or `templates/module-simple.md` (util/config/helper/test).
-- **Key rule**: Detailed API signatures and type definitions belong exclusively in api.md. Module docs only contain an API overview table with a link.
-
-#### 8.5 API Docs (`api/<name>.md`)
-**Template**: Read `templates/api.md` for full structure.
-- Single source of truth for all API signatures and type definitions.
-- Mark `@deprecated` APIs with migration guidance (what to use instead).
-- Include parameter constraints where applicable (e.g. "must not be empty", "range 0-100").
-
-#### 8.6 Getting Started (`getting-started.md`)
-**Template**: Read `templates/getting-started.md` for full structure.
-
-#### 8.7 Doc Map (`doc-map.md`)
-**Template**: Read `templates/doc-map.md` for full structure.
-
-#### 8.8 Domain Index (`<domain>/_index.md`)
-**Template**: Read `templates/_index.md` for full structure.
-- One per domain directory. Short overview, architecture diagram, sub-module table — no detailed API docs.
-
-#### 8.9 Source Links
+#### 8.2 Source Links
 
 Attach navigable source links next to documented symbols:
 
@@ -847,42 +813,22 @@ Change type → Minimum doc impact
 
 ### Principle 3 — When in Doubt, Don't Touch
 
-A common failure mode is rewriting a correct paragraph "for better wording" — this creates a large diff with no factual improvement.
+> **🔴 PRESERVE is the default at ≥ 80% match.** If a paragraph is accurate (correctly describes the code) and not outdated (code hasn't changed in a way that contradicts it), leave it alone. Rewriting for style, phrasing, or "cleaner" expression is always wrong — a smaller diff beats a prettier paragraph. The burden of proof is on rewriting, not on preserving.
 
-Rule:
+### Bug-Level Violations (Anti-Patterns + Hard Rules)
 
-> **If the existing description is accurate and not outdated, preserve it exactly.**
-> "Accurate" means: correctly describes what the code does.
-> "Not outdated" means: the code has not changed in a way that contradicts the description.
->
-> Do not rewrite for stylistic preference, different phrasing, or "cleaner" expression.
+Treat the following as bugs, not stylistic choices:
 
-If the description is merely "not ideal" but still correct, leave it alone. A smaller diff is always better than a prettier paragraph.
-
-> **🔴 PRESERVE is the default for ≥ 80% match.**
-> The burden of proof is on rewriting, not on preserving.
-> You MUST actively justify any deviation. A 1-line footer update is always preferable to a full rewrite.
-
-### Anti-Patterns (What Not to Do)
-
-| Anti-pattern | Why it's wrong |
+| Violation | Why it's wrong |
 |---|---|
-| Rewrite doc because "source file changed" without asking: what exactly changed? | Large diff, zero factual improvement |
+| Starting from the module template when patching an existing doc | Creates massive diff for no reason; contradicts "read the baseline first" |
 | Full regeneration when function signature is unchanged | Internal implementation change ≠ doc invalidation |
-| Regenerate full file from template | Creates massive diff for no reason |
-| Rewrite all code examples | Even correct examples get rephrased |
-| Reorder sections | Changes the diff noise, no factual benefit |
-| Regenerate Mermaid diagrams unnecessarily | Diagram was fine before |
-| "Improve" existing descriptions | Accurate = leave alone |
-| Rephrase file structure tree | Only update when structure changed |
-
-### HARDCODEd RULES — Violation is a Bug
-
-- **You MUST read the existing doc before writing anything to it**
-- **You MUST NOT regenerate a Mermaid diagram if its underlying source has not changed**
-- **You MUST NOT rewrite a paragraph that remains accurate**
-- **You MUST NOT rewrite a code example whose code has not changed**
-- **You MUST NOT use the module template as the starting point for an existing doc**
+| Rewriting a paragraph that remains accurate | Accurate = leave alone; "improving" wording yields diff noise |
+| Rewriting code examples whose code has not changed | Even correct examples get rephrased |
+| Regenerating a Mermaid diagram whose source has not changed | Diagram was fine before |
+| Reordering sections | Changes diff noise, no factual benefit |
+| Rephrasing the file structure tree | Only update when structure changed |
+| Writing to an existing doc without reading it first | You can't preserve what you haven't read |
 
 ---
 

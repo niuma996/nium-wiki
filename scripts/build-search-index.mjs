@@ -84,5 +84,8 @@ function walkDir(dir) {
 walkDir(wikiDir);
 
 const outPath = path.join(wikiDir, 'search_index.json');
-fs.writeFileSync(outPath, JSON.stringify(index, null, 0), 'utf-8');
+// Atomic write: write to tmp then rename, so clients never see a half-written JSON.
+const tmpPath = `${outPath}.${process.pid}.tmp`;
+fs.writeFileSync(tmpPath, JSON.stringify(index, null, 0), 'utf-8');
+fs.renameSync(tmpPath, outPath);
 console.log(`search_index.json: ${Object.keys(index).length} entries -> ${outPath}`);

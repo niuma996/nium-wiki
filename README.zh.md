@@ -13,9 +13,11 @@ AI 编程工具（如 Claude Code）的 Skill，将代码库转化为高质量 W
 - 🚀 **深度代码分析**：语义级理解代码逻辑，不仅限于语法解析
 - 📊 **Mermaid 图表**：自动生成架构图、数据流图、依赖关系图
 - 🔗 **交叉链接文档**：文档间双向链接，源码可追溯
-- ⚡ **增量更新**：基于 SHA256 哈希的变更检测，高效再生成
+- ⚡ **幂等增量更新**：随时可重复运行 —— SHA256 变更检测结合依赖图传播，只重写受影响文档，其余文档保持原样
+- ➕ **追加式生成**：新增模块、追加副语言、手改的域首页都能在多次运行中共存，无需整仓重建，不覆盖已有内容
 - 💡 **预编译，而非检索**：对齐 Karpathy LLM Wiki 模式——文档预编译，增量更新
 - 🌐 **多语言支持**：支持 JS/TS/Python/Go/Rust/Java 等 10+ 语言
+- 🧭 **基于依赖图的模块发现**：跨语言无关的依赖图驱动模块划分，配合两阶段事实抽取，API 文档更准确
 - 🔒 **完全离线**：零外部依赖，适用于气隙网络环境
 - 📝 **专业输出**：企业级文档质量标准与自动审计
 
@@ -59,7 +61,8 @@ Skill 会自动执行完整流程：初始化 → 项目分析 → 深度代码�
 │   ├── structure.json       # 项目结构快照
 │   ├── source-index.json    # SHA256 文件哈希（变更检测）
 │   ├── doc-index.json       # 源文件 ↔ 文档双向映射
-│   └── dep-graph.json       # import/require 依赖图
+│   ├── dep-graph.json       # import/require 依赖图
+│   └── facts/               # 模块事实抽取缓存（每模块一份）
 └── wiki/                    # 生成的文档
     ├── index.md             # 项目首页
     ├── architecture.md      # 系统架构 + Mermaid 图表
@@ -98,6 +101,10 @@ npx nium-wiki serve .nium-wiki/wiki
 ```
 
 浏览器访问 `http://localhost:4000` 即可预览生成的文档，支持全文搜索、侧边栏导航、Mermaid 图表渲染，以及**源码抽屉**——点击 Wiki 中的源码链接时会弹出侧边抽屉显示源文件内容。
+
+<p align="center">
+  <img src="assets/local_server.png" alt="本地预览服务器" width="800" />
+</p>
 
 ### Wiki 生成效果展示
 
@@ -154,7 +161,7 @@ Nium-Wiki 的核心设计是利用 AI 编程工具在日常使用中对项目的
 - 持续优化文档效果，减少模型交互次数
 - 集中式文档管理服务
 - 智能检索工具（跨工程）
-- Karpathy LLM Wiki Schema 层融合：将文档组织规则显式建模为第一层 Schema，使增量更新更精确一致
+- Karpathy LLM Wiki Schema 层融合：在现有模块事实（ModuleFacts）Schema 基础上，继续扩展 Wiki 组织规则（域划分、章节契约、跨文档关系）并以此驱动章节级增量更新
 
 ## 应用场景
 

@@ -8,7 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 
 import { MIME_TYPES } from './utils';
 import { handleVendorRequest } from './vendor';
@@ -78,14 +78,19 @@ export function prepareDocsify(
     // 兜底：确保 sidebar.json 存在（server 启动时一次性完成，不在请求路径上判断）
     ensureSidebarJson(a.dir, a.lang);
 
-    // 生成搜索索引 / Build search index
+    // 异步构建搜索索引，不阻塞 server 启动；首次构建完成前若无索引文件，客户端会回退到动态抓取
+    // Build search index asynchronously — does not block startup.
+    // If no index exists yet, the client falls back to dynamic crawling.
     try {
-      execSync(`node "${path.resolve(__dirname, '..', '..', 'scripts', 'build-search-index.mjs')}" "${a.dir}"`, {
-        stdio: 'pipe',
-        timeout: 30000,
-      });
-    } catch (e) {
-      // non-fatal: search will fall back to dynamic crawling
+      const child = spawn(
+        'node',
+        [path.resolve(__dirname, '..', '..', 'scripts', 'build-search-index.mjs'), a.dir],
+        { stdio: 'ignore', detached: false },
+      );
+      child.on('error', () => { /* non-fatal: search falls back to dynamic crawling */ });
+      child.unref();
+    } catch {
+      // spawn itself failed — non-fatal
     }
   }
 
@@ -169,10 +174,15 @@ function broadcastSSE(data: object): void {
   }
 }
 
-/** 失效侧边栏缓存并通知浏览器刷新 / Invalidate sidebar cache and notify browser to reload */
+/** 失效侧边栏缓存并通知浏览器刷新（去抖合并批量事件）/ Invalidate sidebar cache and notify browser (debounced to coalesce bursts) */
+let reloadTimer: NodeJS.Timeout | null = null;
 function invalidateAndReload(changedPath: string): void {
   sidebarCache.clear();
-  broadcastSSE({ type: 'reload', path: changedPath });
+  if (reloadTimer) clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(() => {
+    reloadTimer = null;
+    broadcastSSE({ type: 'reload', path: changedPath });
+  }, 100);
 }
 
 // ─────────────────────────────────────────────
@@ -284,7 +294,7 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
       const params = new URLSearchParams(query);
       const filePath = params.get('path') ?? '/';
       const rawBase = path.join(wikiBasePath, 'raw');
-      const fullPath = path.join(rawBase, decodeURIComponent(filePath));
+      const fullPath = path.join(rawBase, filePath);
       const resolved = path.resolve(fullPath);
       const resolvedBase = path.resolve(rawBase);
       if (!resolved.startsWith(resolvedBase)) {
@@ -536,6 +546,7 @@ ${prismScripts}
   // Graceful shutdown: clean up all watchers and SSE connections
   // 优雅关闭：清理所有监视器和 SSE 连接
   server.on('close', () => {
+    if (reloadTimer) { clearTimeout(reloadTimer); reloadTimer = null; }
     for (const w of watchers) {
       try { w.close(); } catch { /* ignore */ }
     }

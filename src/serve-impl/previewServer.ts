@@ -17,6 +17,7 @@ import { getSidebarMarkdown } from './sidebarJson';
 import { generateSidebarMd } from './sidebar';
 import { generateSidebarJson, migrateFromSidebarMd } from '../generation/generateSidebarJson';
 import { loadI18nConfig, getAvailableLanguages } from '../utils/i18n';
+import { renderSigma, loadGraphData } from '../core/graphRender';
 
 // ─────────────────────────────────────────────
 // Sidebar bootstrap: ensure sidebar.json exists
@@ -269,6 +270,36 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         'Location': '/',
       });
       res.end();
+      return;
+    }
+
+    // /_graph → interactive Sigma.js relationship graph
+    if (urlPath === '/_graph') {
+      const projectRoot = path.resolve(wikiBasePath, '..');
+      try {
+        const { lang } = resolveWikiDir(req);
+
+        const data = loadGraphData(projectRoot);
+        if (data.nodes.length === 0) {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+          res.end(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Graph</title>
+<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f9f9f9}
+.box{text-align:center;padding:40px;background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.1);max-width:480px}
+h2{margin:0 0 12px;color:#333}p{color:#666;margin:0 0 20px;line-height:1.6}
+code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-size:.9em}</style></head>
+<body><div class="box"><h2>No graph data</h2>
+<p>Run <code>nium-wiki build-deps</code> first to generate the dependency graph, then reload this page.</p>
+<button onclick="location.reload()" style="padding:8px 20px;border-radius:4px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:.9em">Reload</button>
+</div></body></html>`);
+          return;
+        }
+        const html = renderSigma(data, { title: name, lang });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+        res.end(html);
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(`Graph render failed: ${(err as Error).message}\n\nTip: run 'nium-wiki build-deps' first to generate dep-graph.json.`);
+      }
       return;
     }
 

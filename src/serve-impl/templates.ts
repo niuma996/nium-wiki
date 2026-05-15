@@ -60,15 +60,12 @@ export function generateDocsifyIndex(projectName: string, languages?: LangOption
   const hasMultiLang = languages && languages.length > 1;
 
   const langSwitcherStyle = hasMultiLang ? `
-    .lang-switcher {
-      position: fixed; top: 10px; right: 16px; z-index: 100;
-      display: flex; align-items: center; gap: 6px;
-    }
     .lang-switcher select {
-      padding: 4px 8px; border-radius: 4px; border: 1px solid var(--nw-btn-border);
-      font-size: 0.85em; background: var(--nw-btn-bg); cursor: pointer;
+      padding: 4px 10px 4px 26px; border-radius: 4px; border: 1px solid var(--nw-btn-border);
+      font-size: 0.85em; color: var(--nw-btn-color); background: var(--nw-btn-bg) no-repeat 6px center; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23666' stroke-width='1.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418'/%3E%3C/svg%3E");
+      background-size: 14px 14px;
     }
-    .lang-switcher svg { color: var(--nw-btn-color); flex-shrink: 0; }
     /* Docsify search: inline SVG icon via ::before */
     .search { display: flex; align-items: center; }
     .search::before {
@@ -84,11 +81,47 @@ export function generateDocsifyIndex(projectName: string, languages?: LangOption
     .search input[type=text] { border: none; outline: none; background: transparent; box-shadow: none; }
     ` : '';
 
+  const graphBtnStyle = `
+    .nw-top-bar {
+      position: fixed; top: 10px; right: 16px; z-index: 100;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .nw-graph-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 4px;
+      border: 1px solid var(--nw-btn-border); background: var(--nw-btn-bg);
+      color: var(--nw-btn-color); cursor: pointer; font-size: 0.85em;
+      text-decoration: none; transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .nw-graph-btn:hover {
+      background: var(--nw-btn-hover-bg); color: var(--nw-btn-hover-color);
+      border-color: var(--nw-btn-hover-border); text-decoration: none;
+    }
+    .nw-graph-btn svg { flex-shrink: 0; }
+  `;
+
+  const graphBtnHtml = `
+  <a class="nw-graph-btn" href="/_graph" target="_blank" title="Relationship Graph">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="6" cy="6" r="2.5"/>
+      <circle cx="18" cy="6" r="2.5"/>
+      <circle cx="12" cy="18" r="2.5"/>
+      <path stroke-linecap="round" d="M8.5 6h7M7.5 8l3.5 8M16.5 8l-3.5 8"/>
+    </svg>
+    <span>Graph</span>
+  </a>`;
+
+  const graphLabelSyncScript = `
+(function(){
+  var map={zh:['关系图谱','图谱'],en:['Relationship Graph','Graph'],ja:['関係図','グラフ'],ko:['관계도','그래프'],fr:['Graphe de relations','Graphe'],de:['Beziehungsgraph','Graph'],es:['Grafo de relaciones','Grafo'],pt:['Grafo de relações','Grafo'],ru:['Граф связей','Граф']};
+  var m=document.cookie.match(/nw_lang=([a-z]{2})/);
+  var lb=map[m?m[1]:'en']||map['en'];
+  var btn=document.querySelector('.nw-graph-btn');
+  if(btn){btn.title=lb[0];var sp=btn.querySelector('span');if(sp)sp.textContent=lb[1];}
+})();`;
+
   const langSwitcherHtml = hasMultiLang
     ? `\n  <div class="lang-switcher">
-    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418"/>
-    </svg>
     <select id="lang-switcher" onchange="if(this.value)window.location.href='/_api/switch-lang?lang='+this.value">
       ${languages!.map(l => `<option value="${escapeHtml(l.lang)}">${escapeHtml(l.label)}</option>`).join('\n      ')}
     </select>
@@ -275,9 +308,12 @@ ${VENDOR_HEAD}
     #src-drawer-close:hover { background: #f0f0f0; }
     #src-drawer-iframe { flex: 1; border: none; background: var(--nw-code-bg); }
     ${langSwitcherStyle}
+    ${graphBtnStyle}
   </style>
 </head>
-<body>${langSwitcherHtml}
+<body>
+  <div class="nw-top-bar">${graphBtnHtml}${langSwitcherHtml}
+  </div>
   <div id="app">${escapeHtml(search.loading)}</div>
   <button id="scroll-top" title="${escapeHtml(search.scrollTop)}">&#8679;</button>
   <!-- Search modal -->
@@ -326,6 +362,8 @@ ${VENDOR_HEAD}
       },
       relativePath: true,
     };${langSyncScript}
+  <\/script>
+  <script>${graphLabelSyncScript}
   <\/script>
   <script>
     (function() {

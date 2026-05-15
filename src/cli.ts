@@ -65,6 +65,7 @@ import { generateToc, generateSidebar } from './generation/generateToc';
 import { writeSidebarJson, generateSidebarJson, migrateFromSidebarMd } from './generation/generateSidebarJson';
 import { buildDocIndex, enrichWithInference, saveDocIndex } from './core/buildDocIndex';
 import { buildDependencyGraph, saveDependencyGraph, loadDependencyGraph } from './core/buildDeps';
+import { renderGraph, renderAsciiSummary, OutputFormat, EdgeType, NodeType } from './core/graphRender';
 import { loadCache } from './utils/cache';
 import {
   buildIncrementalPlan,
@@ -423,6 +424,85 @@ program
 
     const edgeCount = Object.values(depGraph.imports).reduce((s, v) => s + v.length, 0);
     console.log(`✅ Dependency graph built: ${liveFiles.length} files, ${edgeCount} edges`);
+  });
+
+// ── graph ──────────────────────────────────────────────
+program
+  .command('graph')
+  .description('Render relationship graph from cache (dep-graph + doc-index)')
+  .argument('[project-path]', 'Project root directory', process.cwd())
+  .option('-f, --format <fmt>', 'Output format: ascii | svg | dot | sigma (default: ascii)', 'ascii')
+  .option('-i, --interactive', 'Open interactive Sigma.js graph in browser (shortcut for --format sigma -o <name>-graph.html)', false)
+  .option('-p, --path <prefix>', 'Filter to sub-path prefix (e.g. src/core)')
+  .option('-e, --edge-types <types>', 'Comma-separated edge types: import,refers,links (default: all)')
+  .option('-n, --node-types <types>', 'Comma-separated node types: source,doc,module (default: all)')
+  .option('--max-nodes <n>', 'Limit number of nodes shown', '200')
+  .option('-o, --output <file>', 'Write output to file instead of stdout')
+  .option('--summary', 'Show directory summary table instead of graph', false)
+  .action((projectPath: string, opts: {
+    format: string;
+    interactive: boolean;
+    path?: string;
+    edgeTypes?: string;
+    nodeTypes?: string;
+    maxNodes: string;
+    output?: string;
+    summary: boolean;
+  }) => {
+    const resolved = path.resolve(projectPath);
+    if (!requireWikiDir(resolved)) { process.exitCode = 1; return; }
+
+    const format: OutputFormat = opts.interactive ? 'sigma' : (opts.format as OutputFormat);
+    const maxNodes = parseInt(opts.maxNodes, 10);
+    const edgeTypes = opts.edgeTypes
+      ? opts.edgeTypes.split(',').map(s => s.trim()) as EdgeType[]
+      : undefined;
+    const nodeTypes = opts.nodeTypes
+      ? opts.nodeTypes.split(',').map(s => s.trim()) as NodeType[]
+      : undefined;
+
+    // Auto-name output for interactive mode
+    let outputPath = opts.output;
+    if (opts.interactive && !outputPath) {
+      const projectName = path.basename(resolved).replace(/[^a-zA-Z0-9_-]/g, '_');
+      outputPath = path.join(resolved, `${projectName}-graph.html`);
+    }
+
+    try {
+      if (opts.summary) {
+        const { loadGraphData } = require('./core/graphRender');
+        const data = loadGraphData(resolved);
+        const output = renderAsciiSummary(data);
+        if (opts.output) {
+          fs.writeFileSync(opts.output, output, 'utf-8');
+          console.log(`✅ Written to ${opts.output}`);
+        } else {
+          console.log(output);
+        }
+        return;
+      }
+
+      const output = renderGraph(resolved, {
+        format,
+        pathPrefix: opts.path,
+        edgeTypes,
+        nodeTypes,
+        maxNodes,
+      });
+
+      if (outputPath) {
+        fs.writeFileSync(outputPath, output, 'utf-8');
+        console.log(`✅ ${format === 'sigma' ? 'Interactive' : 'Graph'} written to ${outputPath}`);
+        if (format === 'sigma') {
+          console.log(`   Open in browser: file://${path.resolve(outputPath)}`);
+        }
+      } else {
+        console.log(output);
+      }
+    } catch (err) {
+      console.error(`❌ Failed to render graph: ${(err as Error).message}`);
+      process.exitCode = 1;
+    }
   });
 
 // ── sanitize-links ──────────────────────────────────────

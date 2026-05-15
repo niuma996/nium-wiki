@@ -351,6 +351,7 @@ export function renderAscii(data: GraphData): string {
     const [group, groupNodes] = sortedGroups[gi];
     const isLastGroup = gi === sortedGroups.length - 1;
     const groupPrefix = isLastGroup ? '└── ' : '├── ';
+    void groupPrefix;
 
     lines.push('');
     lines.push(`┌─ ${group}/`);
@@ -372,6 +373,7 @@ export function renderAscii(data: GraphData): string {
           const depLabel = depNode ? depNode.label : shortLabel(dep);
           const arrow = edgeLabel[edges.find(e => e.from === node.id && e.to === dep)?.type || 'import'];
           const isLastDep = di === shown.length - 1 && hidden === 0;
+          void isLastDep;
           const depPrefix = isLast ? '    ' : '│   ';
           lines.push(`${depPrefix}  ${arrow} ${depLabel}`);
         }
@@ -452,6 +454,7 @@ const EDGE_STYLE: Record<EdgeType, string> = {
   refers: 'dotted',
   links: 'dashed',
 };
+void EDGE_STYLE;
 
 /**
  * Render graph as SVG. Uses a simple layered layout (topological ranks).
@@ -500,12 +503,14 @@ export function renderSvg(data: GraphData, opts: { title?: string } = {}): strin
   }
 
   const maxRank = Math.max(...[...ranks.keys()]);
+  void maxRank;
 
   // Positions
   const pos = new Map<string, { x: number; y: number }>();
   for (const [rank, ids] of ranks) {
     const y = PAD_Y + rank * RANK_Y;
     const totalW = ids.length * NODE_W + (ids.length - 1) * PAD_X;
+    void totalW;
     let x = PAD_X;
     for (const id of ids) {
       pos.set(id, { x, y });
@@ -697,16 +702,6 @@ function buildSigmaData(data: GraphData, initialIds: Set<string>): { nodes: Sigm
 
   // ForceAtlas2 on initial nodes only — they spread out naturally to fill the viewport
   const initialNodes = allNodes.filter(n => !n.hidden);
-  const initialEdges = data.edges
-    .filter(e => initialIds.has(e.from) && initialIds.has(e.to))
-    .map(e => ({ source: e.from, target: e.to, edgeType: e.type, color: EDGE_COLOR_HEX[e.type], size: 1.2 }));
-
-  // Random spread as starting point — gives nodes room to disperse before force settling
-  const spreadSize = 4000;
-  initialNodes.forEach(n => {
-    n.x = (Math.random() - 0.5) * spreadSize;
-    n.y = (Math.random() - 0.5) * spreadSize;
-  });
 
   applyRepulsionLayout(initialNodes);
 
@@ -736,7 +731,7 @@ function applyRepulsionLayout(nodes: SigmaNode[]): void {
   const ITERATIONS = 300;
 
   // Randomized circular start — gives a roughly spherical initial shape
-  nodes.forEach((node, i) => {
+  nodes.forEach((node, _i) => {
     const angle = Math.random() * 2 * Math.PI;
     const r = Math.random() * MAX_RADIUS;
     node.x = Math.cos(angle) * r;
@@ -748,10 +743,11 @@ function applyRepulsionLayout(nodes: SigmaNode[]): void {
   for (let iter = 0; iter < ITERATIONS; iter++) {
     forces.forEach(f => { f[0] = 0; f[1] = 0; });
 
-    // Pairwise repulsion — sampled for speed on large graphs
+    // Pairwise repulsion — randomly sampled for speed on large graphs
     const sampleRate = Math.max(1, Math.floor(n / 80));
     for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j += sampleRate) {
+      for (let j = i + 1; j < n; j++) {
+        if (sampleRate > 1 && Math.random() > 1 / sampleRate) continue;
         const dx = nodes[i].x - nodes[j].x;
         const dy = nodes[i].y - nodes[j].y;
         const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
@@ -832,6 +828,7 @@ function computeInitialNodeIds(data: GraphData): Set<string> {
   while (visible.size < 500 && frontier.length > 0) {
     const nextFrontier: string[] = [];
     for (const nodeId of frontier) {
+      if (visible.size >= 500) break;
       const neighbors = data.edges
         .filter(e => e.type === 'import' && (e.from === nodeId || e.to === nodeId))
         .map(e => e.from === nodeId ? e.to : e.from)
@@ -842,7 +839,6 @@ function computeInitialNodeIds(data: GraphData): Set<string> {
         nextFrontier.push(nid);
         if (visible.size >= 500) break;
       }
-      if (visible.size >= 500) break;
     }
     frontier = nextFrontier;
   }
@@ -976,6 +972,10 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
     let renderer, graph;
     let selectedNodeId = null;
 
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     function buildGraph() {
       const Graph = graphology.Graph;
       const g = new Graph({ multi: true, type: 'directed' });
@@ -986,6 +986,7 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
           nodeType: n.nodeType,
           size: n.size,
           color: n.color,
+          origColor: n.color,
           inDegree: n.inDegree,
           outDegree: n.outDegree,
           x: n.x,
@@ -1001,6 +1002,7 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
           g.addEdgeWithKey('e' + i, e.source, e.target, {
             edgeType: e.edgeType,
             color: e.color,
+            origColor: e.color,
             size: e.size,
             type: 'arrow',
             hidden: sH || tH,
@@ -1020,6 +1022,7 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
         if (graph.hasNode(neighborId) && graph.getNodeAttribute(neighborId, 'hidden')) {
           graph.setNodeAttribute(neighborId, 'hidden', false);
           unhidden.add(neighborId);
+          __INITIAL_NODES.add(neighborId);
         }
       }
       if (unhidden.size > 0) {
@@ -1058,11 +1061,11 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
 
       const ins = __FULL_DATA.edges.filter(e => e.target === nodeId).map(e => {
         const src = graph.hasNode(e.source) ? graph.getNodeAttribute(e.source, 'label') : e.source;
-        return '<div class="conn">&nbsp;&nbsp;← <span style="color:' + (edgeColors[e.edgeType] || '#64748b') + '">' + src + '</span> (' + e.edgeType + ')</div>';
+        return '<div class="conn">&nbsp;&nbsp;← <span style="color:' + (edgeColors[e.edgeType] || '#64748b') + '">' + esc(src) + '</span> (' + esc(e.edgeType) + ')</div>';
       }).join('');
       const outs = __FULL_DATA.edges.filter(e => e.source === nodeId).map(e => {
         const tgt = graph.hasNode(e.target) ? graph.getNodeAttribute(e.target, 'label') : e.target;
-        return '<div class="conn">&nbsp;&nbsp;→ <span style="color:' + (edgeColors[e.edgeType] || '#64748b') + '">' + tgt + '</span> (' + e.edgeType + ')</div>';
+        return '<div class="conn">&nbsp;&nbsp;→ <span style="color:' + (edgeColors[e.edgeType] || '#64748b') + '">' + esc(tgt) + '</span> (' + esc(e.edgeType) + ')</div>';
       }).join('');
 
       // Expand button for source nodes with hidden neighbors
@@ -1093,7 +1096,7 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
         doc: document.getElementById('f-doc').checked,
       };
       graph.forEachNode((id, attr) => {
-        graph.setNodeAttribute(id, 'hidden', !visible[attr.nodeType]);
+        graph.setNodeAttribute(id, 'hidden', !visible[attr.nodeType] || !__INITIAL_NODES.has(id));
       });
       graph.forEachEdge((id, attr, src, tgt) => {
         const sH = graph.getNodeAttribute(src, 'hidden');
@@ -1144,7 +1147,7 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
           }
         },
         edgeReducer: (edgeId, attr) => {
-          if (!selectedNodeId) return attr;
+          if (!selectedNodeId) return { ...attr, color: attr.origColor || attr.color };
           const [s, t] = graph.extremities(edgeId);
           if (s === selectedNodeId || t === selectedNodeId) {
             return { ...attr, color: '#60a5fa' };
@@ -1204,11 +1207,9 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
           refreshSelection();
           updateVisibleCount();
           // Update connections list to show newly visible neighbors (don't rebuild whole panel)
-          const nodeType = graph.getNodeAttribute(nodeId, 'nodeType');
-          const tColor = typeColors[nodeType] || '#333';
           const outs = __FULL_DATA.edges.filter(ed => ed.source === nodeId).map(ed => {
             const tgt = graph.hasNode(ed.target) ? graph.getNodeAttribute(ed.target, 'label') : ed.target;
-            return '<div class="conn">&nbsp;&nbsp;→ <span style="color:' + (edgeColors[ed.edgeType] || '#94a3b8') + '">' + tgt + '</span> (' + ed.edgeType + ')</div>';
+            return '<div class="conn">&nbsp;&nbsp;→ <span style="color:' + (edgeColors[ed.edgeType] || '#94a3b8') + '">' + esc(tgt) + '</span> (' + esc(ed.edgeType) + ')</div>';
           }).join('');
           // Find the OUT section and update only it
           const connsEl = document.getElementById('detail-conns');

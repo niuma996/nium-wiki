@@ -99,8 +99,25 @@ export function prepareDocsify(
 }
 
 // ─────────────────────────────────────────────
-// Index.html 内存缓存 / Index.html in-memory cache
+// Graph HTML 内存缓存 / Graph HTML in-memory cache
 // ─────────────────────────────────────────────
+
+/** key: `${projectRoot}:${lang}`, value: cached HTML string */
+const graphHtmlCache = new Map<string, string>();
+
+function getCachedGraphHtml(projectRoot: string, lang: string, title: string): string | null {
+  const key = `${projectRoot}:${lang}`;
+  if (graphHtmlCache.has(key)) return graphHtmlCache.get(key)!;
+  const data = loadGraphData(projectRoot);
+  if (data.nodes.length === 0) return null;
+  const html = renderSigma(data, { title, lang });
+  graphHtmlCache.set(key, html);
+  return html;
+}
+
+export function invalidateGraphCache(): void {
+  graphHtmlCache.clear();
+}
 
 /** key: wikiDir, value: cached HTML string */
 const indexHtmlCache = new Map<string, string>();
@@ -234,6 +251,12 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
         ) {
           invalidateAndReload(filename);
         }
+        if (
+          filename === 'dep-graph.json' ||
+          filename === 'doc-index.json'
+        ) {
+          invalidateGraphCache();
+        }
       });
       watcher.on('error', () => { /* ignore single watch error */ });
       watchers.push(watcher);
@@ -278,9 +301,8 @@ export function startServer(wikiBasePath: string, port: number, projectName?: st
       const projectRoot = path.resolve(wikiBasePath, '..');
       try {
         const { lang } = resolveWikiDir(req);
-
-        const data = loadGraphData(projectRoot);
-        if (data.nodes.length === 0) {
+        const html = getCachedGraphHtml(projectRoot, lang, name);
+        if (!html) {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
           res.end(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Graph</title>
 <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f9f9f9}
@@ -293,7 +315,6 @@ code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-size:.9em}</style
 </div></body></html>`);
           return;
         }
-        const html = renderSigma(data, { title: name, lang });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
         res.end(html);
       } catch (err) {

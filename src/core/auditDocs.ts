@@ -57,7 +57,7 @@ const SCORE_TIERS: Record<string, ScoreTiers> = {
   core: {
     sectionThresholds: [8, 6],       // ≥8 → 3pts, ≥6 → 2pts, ≥5 → 1pt (fixed min)
     diagramThresholds: [3, 2, 2],    // 3pts≥3, 2pts≥2, 1pt≥2 (must meet minDiagrams=2 to score)
-    exampleThresholds: [3, 1],
+    exampleThresholds: [5, 3],       // SKILL.md requires 5+ examples for core modules
     crossLinkThresholds: [3, 1],
   },
   utility: {
@@ -115,8 +115,8 @@ function evaluateQualityLevel(
 
   if (m.hasSourceTracing) score += 2;
 
-  if (score >= 12) return 'professional';
-  if (score >= 7) return 'standard';
+  if (score >= 10) return 'professional';
+  if (score >= 6) return 'standard';
   return 'basic';
 }
 
@@ -218,12 +218,9 @@ function countEmptySections(lines: string[]): { count: number; titles: string[] 
 function generateIssues(
   m: QualityMetrics,
   emptyTitles: string[],
-  wikiDir: string | undefined,
-  explicitRole?: string,
+  role: string,
 ): string[] {
   const issues: string[] = [];
-  // Inference order: explicit role > dir structure > filename / 推断顺序: explicit role > 目录结构 > 文件名
-  const role = explicitRole ?? (wikiDir ? inferRoleFromWikiPath(wikiDir, m.filePath) : 'auto');
   const expected = calculateExpectedMetrics(m.filePath, role);
 
   if (m.lineCount < expected.minLines) {
@@ -239,7 +236,7 @@ function generateIssues(
     issues.push(`Insufficient code examples: ${m.codeExampleCount}/${expected.minExamples}`);
   }
   if (!m.hasSourceTracing && expected.minLines >= 150) {
-    issues.push('Missing source tracing (Section sources)');
+    issues.push('Missing source tracing (add "**Source references**" / "**Diagram data sources**" sections)');
   }
   if (expected.minSections >= 6) {
     if (!m.hasBestPractices) issues.push('Core module missing "Best Practices" section');
@@ -542,7 +539,7 @@ export function analyzeDocument(
   metrics.crossLinkCount = (content.match(/\[.*?\]\((?!http).*?\.md.*?\)/g) || []).length;
 
   // 检查源码追溯 / Check source tracing
-  metrics.hasSourceTracing = /\*\*Section sources\*\*|\*\*Diagram sources\*\*|file:\/\//.test(content);
+  metrics.hasSourceTracing = /\*\*Source references\*\*|\*\*Diagram data sources\*\*/.test(content);
 
   // 检查关键章节（语言感知）/ Check key sections (language-aware)
   const lower = content.toLowerCase();
@@ -553,7 +550,7 @@ export function analyzeDocument(
 
   const role = explicitRole ?? (wikiDir ? inferRoleFromWikiPath(wikiDir, filePath) : 'auto');
   metrics.qualityLevel = evaluateQualityLevel(metrics, role);
-  metrics.issues = generateIssues(metrics, emptyTitles, wikiDir, explicitRole);
+  metrics.issues = generateIssues(metrics, emptyTitles, role);
 
   return metrics;
 }

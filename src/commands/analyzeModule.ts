@@ -393,7 +393,7 @@ function calculateComplexity(
 
   // 归一化评分
   const fileScore = Math.min(fileCount * 3, 30);
-  const lineScore = Math.min(totalLines / 50, 30);
+  const lineScore = Math.min(totalLines / 100, 30); // raised divisor: single 1500-line file no longer saturates this dimension
   const exportScore = Math.min(exportCount * 1.5, 20);
   const depthScore = Math.min(maxDepth * 5, 20);
   const score = Math.round(fileScore + lineScore + exportScore + depthScore);

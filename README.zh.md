@@ -46,7 +46,7 @@ Skill 会自动执行完整流程：初始化 → 项目分析 → 深度代码�
 代码变更后增量更新：
 
 ```
-> update wiki
+> 更新wiki
 ```
 
 通过 SHA256 哈希检测变更文件。`incremental` 命令结合 diff 分析、依赖图遍历和文档间传播，精准定位受影响的 Wiki 页面——仅重写变更部分，不多做。
@@ -100,15 +100,40 @@ npx nium-wiki serve --port 3000
 npx nium-wiki serve .nium-wiki/wiki
 ```
 
-浏览器访问 `http://localhost:4000` 即可预览生成的文档，支持全文搜索、侧边栏导航、Mermaid 图表渲染，以及**源码抽屉**——点击 Wiki 中的源码链接时会弹出侧边抽屉显示源文件内容。
+浏览器访问 `http://localhost:4000` 即可预览生成的文档，支持全文搜索、侧边栏导航、Mermaid 图表渲染，以及**源码抽屉**——点击 Wiki 中任意源码链接时自动打开。
 
 <p align="center">
   <img src="assets/local_server.png" alt="本地预览服务器" width="800" />
 </p>
 
+### 关系图谱
+
+在预览服务器右上角点击 **Graph** 按钮，即可在 `/_graph` 打开交互式关系图谱。
+
+图谱可视化了项目中所有节点和边的关系：
+
+- **蓝色节点** — 源代码文件（`.ts`、`.js`、`.py` 等）
+- **橙色节点** — 文档文件（`.md`）
+- **边** — 三种关系类型：
+  - `import` — 一个源文件导入另一个源文件
+  - `refers` — 文档文件引用源文件（或反向）
+  - `links` — 文档文件链接到另一个文档文件
+
+对于大型项目（节点数 > 500），图谱优先加载文档节点及其直接关联的源码节点，再沿 import 边向外扩散，直到约 500 个节点可见。点击任意源码节点可按需展开其隐藏的 import 邻居。
+
+点击节点可高亮选中：关联节点保持原色，无关节点变暗。右侧详情面板显示选中节点的入边和出边信息。
+
+<p align="center">
+  <img src="assets/graph_1.png" alt="关系图谱 — 全局视图" width="800" />
+</p>
+
+<p align="center">
+  <img src="assets/graph_2.png" alt="关系图谱 — 节点选中" width="800" />
+</p>
+
 ### Wiki 生成效果展示
 
-生成效果示例可参考 [claude-code-sourcemap-wiki](https://github.com/niuma996/claude-code-sourcemap-wiki)。
+生成效果示例可参考 [claude-code-sourcemap-wiki](https://github.com/niuma996/claude-code-sourcemap-wiki)，这是一个使用 Nium-Wiki 生成的完整项目示例。
 
 ### 配置说明
 
@@ -137,10 +162,7 @@ npx nium-wiki serve .nium-wiki/wiki
 
 Nium-Wiki 设计为完全离线运行，**零外部依赖**， 完美适用于企业内部网络和气隙环境：
 
-### 文档生成
-- ✅ 徽章生成使用内联 SVG（无 shields.io 依赖）
-
-### 预览服务
+### 预览服务器
 - ✅ 所有前端资源（Docsify、Prism.js、Mermaid）均本地打包
 - ✅ 无 CDN 请求或外部 API 调用
 
@@ -158,6 +180,7 @@ Nium-Wiki 的核心设计是利用 AI 编程工具在日常使用中对项目的
 > 对于已经使用 AI 编程工具一段时间的项目，首次生成的开销通常在可接受范围内。日常使用中以增量更新为主，开销很小。
 
 ## 开发中的功能
+
 - 持续优化文档效果，减少模型交互次数
 - 集中式文档管理服务
 - 智能检索工具（跨工程）

@@ -106,6 +106,31 @@ Open `http://localhost:4000` in your browser to preview the generated docs, with
   <img src="assets/local_server.png" alt="Local Preview Server" width="800" />
 </p>
 
+### Relationship Graph
+
+Click the **Graph** button in the top-right corner of the preview server to open an interactive relationship graph at `/_graph`.
+
+The graph visualizes all nodes and edges extracted from your project:
+
+- **Blue nodes** — source code files (`.ts`, `.js`, `.py`, etc.)
+- **Orange nodes** — documentation files (`.md`)
+- **Edges** — three relationship types:
+  - `import` — one source file imports another
+  - `refers` — a doc file references a source file (or vice versa)
+  - `links` — a doc file links to another doc file
+
+For large projects (> 500 nodes), the graph loads docs and their directly linked source nodes first, then expands outward via import edges until ~500 nodes are visible. Click any source node to reveal its hidden import neighbors on demand.
+
+Click a node to highlight it: connected nodes stay at full color, unrelated nodes dim. The detail panel on the right shows incoming and outgoing edges for the selected node.
+
+<p align="center">
+  <img src="assets/graph_1.png" alt="Relationship Graph — full view" width="800" />
+</p>
+
+<p align="center">
+  <img src="assets/graph_2.png" alt="Relationship Graph — node selected" width="800" />
+</p>
+
 ### Wiki Generation Showcase
 
 See [claude-code-sourcemap-wiki](https://github.com/niuma996/claude-code-sourcemap-wiki) for a live example of a full project generated with Nium-Wiki.

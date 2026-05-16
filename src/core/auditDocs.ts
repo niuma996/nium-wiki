@@ -415,7 +415,7 @@ export function fixMermaidDiagram(body: string): { fixed: string; fixedIds: stri
       if (allIds.has(id)) {
         // ID conflict detected — auto-fix by renaming node
         const newId = `${id}_node`;
-        lines[i] = lines[i].replace(new RegExp(`(?<!_)${id}(?=\\[)`), newId);
+        lines[i] = lines[i].replace(new RegExp(`(^|[^_])${id}(?=\\[)`), '$1' + newId);
         fixedIds.push(`${id} → ${newId}`);
         allIds.add(newId);
       } else {
@@ -430,7 +430,7 @@ export function fixMermaidDiagram(body: string): { fixed: string; fixedIds: stri
       if (allIds.has(id)) {
         // ID conflict detected — auto-fix by renaming subgraph
         const newId = `${id}_sub`;
-        lines[i] = lines[i].replace(new RegExp(`(?<!_)${id}(?=\\[)`), newId);
+        lines[i] = lines[i].replace(new RegExp(`(^|[^_])${id}(?=\\[)`), '$1' + newId);
         fixedIds.push(`${id} → ${newId}`);
         allIds.add(newId);
       } else {

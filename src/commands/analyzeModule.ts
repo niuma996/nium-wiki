@@ -430,7 +430,7 @@ function getModuleDepStats(modulePath: string, graph: ReturnType<typeof loadDepe
 
   for (const [file, importers] of Object.entries(graph.importedBy)) {
     if (file.startsWith(modulePrefix)) {
-      incoming = importers.length;
+      incoming += importers.length;
     }
   }
 

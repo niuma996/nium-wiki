@@ -65,7 +65,7 @@ import { generateToc, generateSidebar } from './generation/generateToc';
 import { writeSidebarJson, generateSidebarJson, migrateFromSidebarMd } from './generation/generateSidebarJson';
 import { buildDocIndex, enrichWithInference, saveDocIndex } from './core/buildDocIndex';
 import { buildDependencyGraph, saveDependencyGraph, loadDependencyGraph } from './core/buildDeps';
-import { renderGraph, renderAsciiSummary, OutputFormat, EdgeType, NodeType } from './core/graphRender';
+import { renderGraph, renderAsciiSummary, loadGraphData, OutputFormat, EdgeType, NodeType } from './core/graphRender';
 import { loadCache } from './utils/cache';
 import {
   buildIncrementalPlan,
@@ -435,7 +435,7 @@ program
   .option('-i, --interactive', 'Open interactive Sigma.js graph in browser (shortcut for --format sigma -o <name>-graph.html)', false)
   .option('-p, --path <prefix>', 'Filter to sub-path prefix (e.g. src/core)')
   .option('-e, --edge-types <types>', 'Comma-separated edge types: import,refers,links (default: all)')
-  .option('-n, --node-types <types>', 'Comma-separated node types: source,doc,module (default: all)')
+  .option('-n, --node-types <types>', 'Comma-separated node types: source,doc (default: all)')
   .option('--max-nodes <n>', 'Limit number of nodes shown', '200')
   .option('-o, --output <file>', 'Write output to file instead of stdout')
   .option('--summary', 'Show directory summary table instead of graph', false)
@@ -470,7 +470,6 @@ program
 
     try {
       if (opts.summary) {
-        const { loadGraphData } = require('./core/graphRender');
         const data = loadGraphData(resolved);
         const output = renderAsciiSummary(data);
         if (opts.output) {

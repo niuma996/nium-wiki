@@ -350,9 +350,6 @@ export function renderAscii(data: GraphData): string {
   for (let gi = 0; gi < sortedGroups.length; gi++) {
     const [group, groupNodes] = sortedGroups[gi];
     const isLastGroup = gi === sortedGroups.length - 1;
-    const groupPrefix = isLastGroup ? '└── ' : '├── ';
-    void groupPrefix;
-
     lines.push('');
     lines.push(`┌─ ${group}/`);
     for (let ni = 0; ni < groupNodes.length; ni++) {
@@ -372,8 +369,6 @@ export function renderAscii(data: GraphData): string {
           const depNode = nodes.find(n => n.id === dep);
           const depLabel = depNode ? depNode.label : shortLabel(dep);
           const arrow = edgeLabel[edges.find(e => e.from === node.id && e.to === dep)?.type || 'import'];
-          const isLastDep = di === shown.length - 1 && hidden === 0;
-          void isLastDep;
           const depPrefix = isLast ? '    ' : '│   ';
           lines.push(`${depPrefix}  ${arrow} ${depLabel}`);
         }
@@ -502,15 +497,10 @@ export function renderSvg(data: GraphData, opts: { title?: string } = {}): strin
     ranks.get(r)!.push(id);
   }
 
-  const maxRank = Math.max(...[...ranks.keys()]);
-  void maxRank;
-
   // Positions
   const pos = new Map<string, { x: number; y: number }>();
   for (const [rank, ids] of ranks) {
     const y = PAD_Y + rank * RANK_Y;
-    const totalW = ids.length * NODE_W + (ids.length - 1) * PAD_X;
-    void totalW;
     let x = PAD_X;
     for (const id of ids) {
       pos.set(id, { x, y });
@@ -1078,7 +1068,7 @@ ${loadVendorScript('sigma', 'dist/sigma.min.js')}
             .filter(id => graph.hasNode(id) && graph.getNodeAttribute(id, 'hidden'))
         );
         if (hiddenNeighborIds.size > 0) {
-          expandBtn = '<button id="detail-expand" data-node-id="' + nodeId + '" style="margin-top:10px;padding:3px 10px;border-radius:4px;border:1px solid #ddd;background:#f8f8f8;color:#333;font-size:11px;cursor:pointer;font-family:inherit">' + __GRAPH_UI['expandBtn'].replace('{n}', hiddenNeighborIds.size) + '</button>';
+          expandBtn = '<button id="detail-expand" data-node-id="' + esc(nodeId) + '" style="margin-top:10px;padding:3px 10px;border-radius:4px;border:1px solid #ddd;background:#f8f8f8;color:#333;font-size:11px;cursor:pointer;font-family:inherit">' + __GRAPH_UI['expandBtn'].replace('{n}', hiddenNeighborIds.size) + '</button>';
         }
       }
 
